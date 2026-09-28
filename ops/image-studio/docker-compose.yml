@@ -1,0 +1,65 @@
+services:
+  open-webui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: image-studio-open-webui:local
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - open_webui_data:/app/backend/data
+    environment:
+      WEBUI_SECRET_KEY: ${OPEN_WEBUI_SECRET_KEY:?Set OPEN_WEBUI_SECRET_KEY}
+      WEBUI_URL: ${IMAGE_STUDIO_URL:?Set IMAGE_STUDIO_URL}
+      WEBUI_NAME: ${IMAGE_STUDIO_NAME:-工作站}
+      DEFAULT_LOCALE: ${IMAGE_STUDIO_LOCALE:-zh-CN}
+      CORS_ALLOW_ORIGIN: ${IMAGE_STUDIO_URL:?Set IMAGE_STUDIO_URL}
+      WEBUI_AUTH_TRUSTED_EMAIL_HEADER: X-Studio-Email
+      WEBUI_AUTH_TRUSTED_NAME_HEADER: X-Studio-Name
+      WEBUI_AUTH_TRUSTED_ROLE_HEADER: X-Studio-Role
+      ENABLE_LOGIN_FORM: "false"
+      ENABLE_SIGNUP: "false"
+      ENABLE_PASSWORD_CHANGE_FORM: "false"
+      ENABLE_PASSWORD_AUTH: "true"
+      DEFAULT_USER_ROLE: user
+      ENABLE_ADMIN_CHAT_ACCESS: "false"
+      WEBUI_AUTH_COOKIE_SECURE: ${IMAGE_STUDIO_COOKIE_SECURE:-false}
+      WEBUI_AUTH_COOKIE_SAME_SITE: lax
+      WEBUI_ADMIN_EMAIL: ${OPEN_WEBUI_ADMIN_EMAIL:?Set OPEN_WEBUI_ADMIN_EMAIL}
+      WEBUI_ADMIN_PASSWORD: ${OPEN_WEBUI_ADMIN_PASSWORD:?Set OPEN_WEBUI_ADMIN_PASSWORD}
+      WEBUI_ADMIN_NAME: ${OPEN_WEBUI_ADMIN_NAME:-Administrator}
+      ENABLE_OLLAMA_API: "false"
+      NEW_API_STUDIO_ORIGIN: ${NEW_API_INTERNAL_ORIGIN:?Set NEW_API_INTERNAL_ORIGIN}
+      ENABLE_OPENAI_API: "true"
+      OPENAI_API_BASE_URL: ${NEW_API_INTERNAL_ORIGIN:?Set NEW_API_INTERNAL_ORIGIN}/api/image-studio/v1
+      OPENAI_API_KEY: ""
+      ENABLE_IMAGE_GENERATION: ${STUDIO_ENABLE_IMAGE_GENERATION:-false}
+      IMAGE_GENERATION_ENGINE: openai
+      IMAGE_GENERATION_MODEL: ${IMAGE_STUDIO_MODEL:-}
+      IMAGES_OPENAI_API_BASE_URL: ${NEW_API_INTERNAL_ORIGIN:?Set NEW_API_INTERNAL_ORIGIN}/api/image-studio/v1
+      IMAGES_OPENAI_API_KEY: ""
+      ENABLE_IMAGE_EDIT: ${STUDIO_ENABLE_IMAGE_EDIT:-false}
+      IMAGE_EDIT_ENGINE: openai
+      IMAGE_EDIT_MODEL: ${IMAGE_STUDIO_EDIT_MODEL:-}
+      IMAGES_EDIT_OPENAI_API_BASE_URL: ${NEW_API_INTERNAL_ORIGIN:?Set NEW_API_INTERNAL_ORIGIN}/api/image-studio/v1
+      IMAGES_EDIT_OPENAI_API_KEY: ""
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - open-webui
+    ports:
+      - "127.0.0.1:${IMAGE_STUDIO_PORT:-3002}:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    environment:
+      NEW_API_INTERNAL_ORIGIN: ${NEW_API_INTERNAL_ORIGIN:?Set NEW_API_INTERNAL_ORIGIN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  open_webui_data:

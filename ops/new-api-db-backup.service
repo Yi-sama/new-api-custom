@@ -1,0 +1,9 @@
+[Unit]
+Description=Create a consistent PostgreSQL backup for new-api
+After=local-fs.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/new-api-db-backup.sh
+Nice=10
+IOSchedulingClass=best-effort

@@ -1,0 +1,15 @@
+services:
+  open-webui:
+    networks:
+      - default
+      - proxy_newapi-network
+
+  gateway:
+    networks:
+      - default
+      - proxy_newapi-network
+
+networks:
+  proxy_newapi-network:
+    external: true
+    name: proxy_newapi-network

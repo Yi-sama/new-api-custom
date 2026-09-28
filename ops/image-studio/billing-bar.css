@@ -1,0 +1,313 @@
+#new-api-console-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+.new-api-image-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.new-api-image-group-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.new-api-image-group-select {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgb(127 127 127 / 0.1);
+  border-radius: 8px;
+  background: rgb(127 127 127 / 0.05);
+}
+
+.new-api-image-group-setting:disabled { opacity: 0.5; }
+.new-api-image-group-setting [role='status']:empty { display: none; }
+
+.new-api-image-picker {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(13rem, 32vw);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.new-api-image-trigger {
+  min-width: 0;
+  max-width: 100%;
+  height: 30px;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.new-api-image-trigger:hover,
+.new-api-image-trigger[aria-expanded='true'] {
+  background: rgb(127 127 127 / 0.1);
+}
+
+.new-api-image-model-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-api-image-options {
+  max-width: min(24rem, calc(100vw - 2rem));
+}
+
+.new-api-image-picker:disabled {
+  opacity: 0.5;
+}
+
+.new-api-image-picker[data-invalid='true'] .new-api-image-trigger {
+  text-decoration: underline dotted;
+}
+
+.new-api-image-size-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.new-api-image-size-trigger {
+  min-width: 0;
+  max-width: min(9.5rem, 28vw);
+  height: 30px;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.new-api-image-size-trigger:hover,
+.new-api-image-size-trigger[aria-expanded='true'] {
+  background: rgb(127 127 127 / 0.1);
+}
+
+.new-api-image-size-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-api-image-size-options {
+  max-width: min(21rem, calc(100vw - 2rem));
+}
+
+.new-api-image-size-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.new-api-image-size-editor[hidden] { display: none; }
+
+.new-api-image-size-editor input {
+  box-sizing: border-box;
+  width: 3.5rem;
+  height: 28px;
+  padding: 2px 4px;
+  border: 1px solid rgb(127 127 127 / 0.25);
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.new-api-image-size-editor button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.new-api-image-size-editor button:hover { background: rgb(127 127 127 / 0.1); }
+
+.new-api-image-size-error {
+  max-width: 8rem;
+  overflow: hidden;
+  color: #dc2626;
+  font-size: 11px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-api-image-size-error:empty { display: none; }
+
+.new-api-image-size-picker[data-invalid='true'] .new-api-image-size-trigger {
+  outline: 1px solid #dc2626;
+  outline-offset: -1px;
+}
+
+@media (max-width: 420px) {
+  .new-api-image-picker { max-width: 31vw; }
+  .new-api-image-size-trigger { max-width: 27vw; }
+  .new-api-image-size-picker[data-editing='true'] { flex-basis: 100%; }
+  .new-api-image-size-error { max-width: 5rem; }
+}
+
+#new-api-billing-badge {
+  display: inline-flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
+  box-sizing: border-box;
+  max-width: min(52vw, 420px);
+  min-width: 0;
+  min-height: 30px;
+  margin-right: 2px;
+  overflow: hidden;
+  padding: 5px 9px;
+  border: 1px solid rgb(161 161 170 / 0.38);
+  border-radius: 9px;
+  background: rgb(39 39 42 / 0.88);
+  color: rgb(244 244 245);
+  font: 12px/1.2 system-ui, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#new-api-billing-summary {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+#new-api-online-count {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+#new-api-online-count::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #a1a1aa;
+}
+
+#new-api-online-count[data-state='ready']::before {
+  background: #22c55e;
+}
+
+#new-api-group-picker {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 0;
+  gap: 1.5rem;
+  margin: 0.125rem 0.125rem 0.25rem;
+  padding: 0 0.375rem;
+  border: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+#new-api-group-label {
+  flex: 0 0 auto;
+  color: #6b7280;
+}
+
+.new-api-group-trigger {
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  background: transparent;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+#new-api-group-picker:not(:disabled) .new-api-group-trigger:hover,
+#new-api-group-picker:not(:disabled) .new-api-group-trigger[aria-expanded='true'] {
+  background: rgb(17 24 39 / 0.06);
+}
+
+.new-api-group-trigger:focus-visible {
+  outline: 2px solid #9ca3af;
+  outline-offset: 2px;
+}
+
+.new-api-group-ratio {
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+  white-space: nowrap;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+html.dark #new-api-group-picker:not(:disabled) .new-api-group-trigger:hover,
+html.dark #new-api-group-picker:not(:disabled) .new-api-group-trigger[aria-expanded='true'] {
+  background: rgb(255 255 255 / 0.08);
+}
+
+html.dark .new-api-group-ratio {
+  color: #9ca3af;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-api-group-trigger {
+    transition: none;
+  }
+}
+
+#new-api-group-picker:disabled {
+  opacity: 0.5;
+}
+
+.new-api-group-options {
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+html.dark #new-api-group-label {
+  color: #9ca3af;
+}
+
+html:not(.dark) #new-api-billing-badge {
+  border-color: rgb(161 161 170 / 0.45);
+  background: rgb(244 244 245);
+  color: rgb(39 39 42);
+}
+
+@media (max-width: 640px) {
+  #new-api-billing-badge {
+    max-width: 44vw;
+    margin-right: 1px;
+    padding: 5px 7px;
+    font-size: 11px;
+  }
+}

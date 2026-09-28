@@ -1,0 +1,21 @@
+:8080 {
+	route {
+		request_header -X-Studio-Email
+		request_header -X-Studio-Name
+		request_header -X-Studio-Role
+
+		forward_auth {$NEW_API_INTERNAL_ORIGIN} {
+			uri /api/image-studio/identity
+			copy_headers X-Studio-Email X-Studio-Name X-Studio-Role
+		}
+
+		@account path /api/image-studio/billing /api/image-studio/context /api/image-studio/groups
+		handle @account {
+			reverse_proxy {$NEW_API_INTERNAL_ORIGIN}
+		}
+
+		handle {
+			reverse_proxy open-webui:8080
+		}
+	}
+}
