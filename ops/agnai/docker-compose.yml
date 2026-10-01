@@ -1,0 +1,20 @@
+services:
+  mongo:
+    image: ${AGNAI_MONGO_IMAGE:-mongo:8}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27028:27017"
+    volumes:
+      - agnai-mongo:/data/db
+  redis:
+    image: ${AGNAI_REDIS_IMAGE:-redis:7-alpine}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6388:6379"
+    volumes:
+      - agnai-redis:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+volumes:
+  agnai-mongo:
+  agnai-redis:

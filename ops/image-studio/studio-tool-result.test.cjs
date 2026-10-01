@@ -88,6 +88,6 @@ test('image studio build entry and injected helpers use the v23 cache namespace'
   assert.match(patchSource, /build \/ "studio-v23"/)
   assert.doesNotMatch(patchSource, /\/static\/studio-[^"']+\?v=2[12]/)
   assert.match(dockerfile, /studio-tool-result\.js \/app\/build\/static\//)
-  assert.match(dockerfile, /studio-link\.js\?v=23/)
-  assert.match(dockerfile, /billing-link\.js\?v=23/)
+  assert.match(dockerfile, /studio-link\.js\?v=24/)
+  assert.match(dockerfile, /billing-link\.js\?v=24/)
 })

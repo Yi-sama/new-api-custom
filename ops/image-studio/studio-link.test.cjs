@@ -7,8 +7,10 @@ const { JSDOM } = require(require.resolve('jsdom', { paths: [join(__dirname, '..
 const source = readFileSync(join(__dirname, 'studio-link.js'), 'utf8')
 const flush = () => new Promise(setImmediate)
 async function setup(t, initial = {}) {
-  const dom = new JSDOM('<nav><button id="model-selector-model-button">Model</button></nav><button id="schedule">Schedule</button>', { url: 'http://localhost:3002/' })
+  const { pageUrl = 'http://localhost:3002/', ...overrides } = initial
+  const dom = new JSDOM('<nav><button id="model-selector-model-button">Model</button></nav><button id="schedule">Schedule</button>', { url: pageUrl })
   t.after(() => dom.window.close())
+  const current = new URL(pageUrl)
   const state = {
     identity: { id: 4, username: 'Alice', email: 'new-api-4@studio.example.com', group: 'default' },
     contextStatus: 200,
@@ -24,12 +26,12 @@ async function setup(t, initial = {}) {
     imageGroup: '',
     imageModels: [],
     imageError: '',
-    ...initial,
+    ...overrides,
   }
   const location = {
-    href: 'http://localhost:3002/',
-    origin: 'http://localhost:3002',
-    pathname: '/',
+    href: current.href,
+    origin: current.origin,
+    pathname: current.pathname,
     replace: (url) => state.redirects.push(url),
   }
   const native = {
@@ -187,6 +189,13 @@ test('main-site logout clears native token and returns to the New API entry', as
   await state.intervals.find(({ delay }) => delay === 15000).fn()
   assert.equal(dom.window.localStorage.getItem('token'), null)
   assert.deepEqual(state.redirects, ['http://localhost:3000/image-studio'])
+})
+
+test('production account loss returns to the production New API entry', async (t) => {
+  const { state } = await setup(t, { pageUrl: 'https://studio.yisama.asia/' })
+  state.contextStatus = 401
+  await state.intervals.find(({ delay }) => delay === 15000).fn()
+  assert.deepEqual(state.redirects, ['https://api.yisama.asia/image-studio'])
 })
 
 test('account switch cannot relabel an old native identity', async (t) => {

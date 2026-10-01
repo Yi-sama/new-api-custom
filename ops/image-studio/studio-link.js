@@ -1,6 +1,13 @@
 (() => {
   const originalFetch = window.fetch.bind(window)
-  const entryHref = 'http://localhost:3000/image-studio'
+  const current = new URL(window.location.href)
+  const newApiOrigin =
+    current.hostname === 'localhost' || current.hostname.endsWith('.localhost')
+      ? `${current.protocol}//${current.hostname}:3000`
+      : current.hostname.startsWith('studio.')
+        ? `${current.protocol}//api.${current.hostname.slice('studio.'.length)}`
+        : current.origin
+  const entryHref = `${newApiOrigin}/image-studio`
   let context
   let groups = {}
   let group = ''

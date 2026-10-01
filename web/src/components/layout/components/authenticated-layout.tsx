@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Outlet, useRouterState } from '@tanstack/react-router'
+
 import { AnimatedOutlet } from '@/components/page-transition'
 import { SkipToMain } from '@/components/skip-to-main'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
@@ -32,7 +34,19 @@ type AuthenticatedLayoutProps = {
 }
 
 export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const defaultOpen = getCookie('sidebar_state') !== 'false'
+
+  if (
+    pathname === '/video-studio' ||
+    pathname === '/video-studio/' ||
+    pathname === '/tavern' ||
+    pathname === '/tavern/'
+  ) {
+    return props.children ?? <Outlet />
+  }
 
   return (
     <LayoutProvider>

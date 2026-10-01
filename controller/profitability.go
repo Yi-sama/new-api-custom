@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -29,12 +31,57 @@ func GetProfitabilitySummary(c *gin.Context) {
 		return
 	}
 
-	report, err := model.GetProfitabilityReport(startTimestamp, endTimestamp)
+	options, err := parseProfitabilityReportOptions(c.Request.URL.Query())
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	report, err := model.GetProfitabilityReportWithOptions(startTimestamp, endTimestamp, options)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 	common.ApiSuccess(c, report)
+}
+
+func parseProfitabilityReportOptions(values url.Values) (model.ProfitabilityReportOptions, error) {
+	options := model.ProfitabilityReportOptions{RevenueBasis: strings.TrimSpace(values.Get("revenue_basis"))}
+	if options.RevenueBasis == "" {
+		options.RevenueBasis = model.ProfitabilityRevenueBasisCalls
+	}
+	if options.RevenueBasis != model.ProfitabilityRevenueBasisCalls && options.RevenueBasis != model.ProfitabilityRevenueBasisCash {
+		return options, errors.New("invalid revenue_basis")
+	}
+
+	rawValues, present := values["channel_ids"]
+	options.ChannelSelectionPresent = present
+	if options.RevenueBasis == model.ProfitabilityRevenueBasisCash {
+		options.ChannelSelectionPresent = false
+		return options, nil
+	}
+	if !present {
+		return options, nil
+	}
+	raw := strings.Join(rawValues, ",")
+	if raw == "" {
+		return options, nil
+	}
+	seen := make(map[int]bool)
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return options, errors.New("invalid channel_ids")
+		}
+		id, err := strconv.Atoi(part)
+		if err != nil || id <= 0 {
+			return options, errors.New("invalid channel_ids")
+		}
+		if !seen[id] {
+			seen[id] = true
+			options.ChannelIDs = append(options.ChannelIDs, id)
+		}
+	}
+	return options, nil
 }
 
 func AddProfitabilityEntry(c *gin.Context) {

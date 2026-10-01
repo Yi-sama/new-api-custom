@@ -43,10 +43,10 @@ const flush = () => new Promise(setImmediate)
 
 async function loadControls(
   t,
-  { html = markup, ok = true, usage = { user_count: 1 }, usageOk = true } = {}
+  { html = markup, ok = true, usage = { user_count: 1 }, usageOk = true, url = 'http://localhost:3002/' } = {}
 ) {
   const dom = new JSDOM(`<!doctype html><body>${html}</body>`, {
-    url: 'http://localhost:3002/',
+    url,
     runScripts: 'outside-only',
   })
   const observers = []
@@ -92,7 +92,7 @@ async function loadControls(
   return { document: dom.window.document, requests, intervals }
 }
 
-function assertPlacement(document) {
+function assertPlacement(document, expectedHref = 'http://localhost:3000/dashboard') {
   const newChat = [...document.querySelectorAll('a#sidebar-new-chat-button')]
     .find((element) => !element.hidden)
   const newChatRow = newChat.parentElement
@@ -110,7 +110,7 @@ function assertPlacement(document) {
   assert.equal(consoleLink.children[1].firstElementChild.className, newChat.children[1].firstElementChild.className)
   assert.equal(
     document.getElementById('new-api-console-link').href,
-    'http://localhost:3000/dashboard'
+    expectedHref
   )
   assert.equal(badge.parentElement, actions)
   assert.equal(badge.nextElementSibling.id, 'first-action')
@@ -148,6 +148,11 @@ test('ordinary users without Workspace get the same console entry above New Chat
   const consoleRow = document.getElementById('new-api-console-link-row')
   assert.equal(consoleRow.nextElementSibling.querySelector('a').id, 'sidebar-new-chat-button')
   assert.equal(document.querySelector('#user-menu-items #new-api-console-link-row'), null)
+})
+
+test('production studio points the console entry at the production New API host', async (t) => {
+  const { document } = await loadControls(t, { url: 'https://studio.yisama.asia/' })
+  assertPlacement(document, 'https://api.yisama.asia/dashboard')
 })
 
 test('billing failure keeps both controls and displays an unavailable balance', async (t) => {

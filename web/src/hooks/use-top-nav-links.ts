@@ -78,6 +78,18 @@ export function useTopNavLinks(): TopNavLink[] {
     requiresAuth: !isAuthed,
   })
 
+  links.push({
+    title: t('Video Studio'),
+    href: '/video-studio',
+    requiresAuth: !isAuthed,
+  })
+
+  links.push({
+    title: t('Tavern'),
+    href: '/tavern',
+    requiresAuth: !isAuthed,
+  })
+
   // Pricing
   const pricing = modules?.pricing
   if (pricing && typeof pricing === 'object' && pricing.enabled) {

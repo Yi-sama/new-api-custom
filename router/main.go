@@ -17,6 +17,7 @@ func SetRouter(router *gin.Engine, assets WebAssets) {
 	SetDashboardRouter(router)
 	SetRelayRouter(router)
 	SetVideoRouter(router)
+	SetVideoStudioRouter(router)
 	SetImageStudioRouter(router)
 	SetImageWorkbenchRouter(router)
 	frontendBaseUrl := os.Getenv("FRONTEND_BASE_URL")

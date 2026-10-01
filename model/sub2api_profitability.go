@@ -59,6 +59,9 @@ func GetSub2APIUsageLogs(startTimestamp, endTimestamp int64) ([]sub2APIUsageLog,
 	query := endpoint.Query()
 	query.Set("timezone", "UTC")
 	query.Set("page_size", "1000")
+	// New usage is appended by ID; descending offset pages shift during live traffic.
+	query.Set("sort_by", "id")
+	query.Set("sort_order", "asc")
 	if startTimestamp > 0 {
 		query.Set("start_date", time.Unix(startTimestamp, 0).UTC().Format("2006-01-02"))
 	}

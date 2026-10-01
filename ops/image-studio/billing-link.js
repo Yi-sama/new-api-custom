@@ -4,7 +4,14 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
 (() => {
   const billingEndpoint = '/api/image-studio/billing'
   const usageEndpoint = '/api/usage'
-  const consoleHref = 'http://localhost:3000/dashboard'
+  const current = new URL(window.location.href)
+  const newApiOrigin =
+    current.hostname === 'localhost' || current.hostname.endsWith('.localhost')
+      ? `${current.protocol}//${current.hostname}:3000`
+      : current.hostname.startsWith('studio.')
+        ? `${current.protocol}//api.${current.hostname.slice('studio.'.length)}`
+        : current.origin
+  const consoleHref = `${newApiOrigin}/dashboard`
   let consoleRow
 
   function isVisible(element) {

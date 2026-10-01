@@ -35,7 +35,47 @@ export interface ProfitabilityUsageUser {
   token_count: number
 }
 
+export type ProfitabilityRevenueBasis = 'calls' | 'cash'
+
+export type ProfitabilityStatus =
+  | 'empty_selection'
+  | 'not_configured'
+  | 'sync_error'
+  | 'unmatched'
+  | 'missing_purchase'
+  | 'no_activity'
+  | 'complete'
+
+export interface ProfitabilityAvailableChannel {
+  id: number
+  name: string
+  status: number
+}
+
+export interface ProfitabilityCallComparison {
+  charge_usd: number
+  sub_usage_usd: number | null
+  effective_ratio: number | null
+  status: string
+}
+
+export interface ProfitabilityGroupCallComparison extends ProfitabilityCallComparison {
+  break_even_ratio: number | null
+  break_even_status: string
+}
+
+export interface ProfitabilityPoolSummary {
+  all_calls: ProfitabilityCallComparison
+  customer_calls: ProfitabilityCallComparison
+  admin_charge_usd: number
+  matched_admin_sub_usage_usd: number
+  outside_selected_sub_usage_usd: number
+  profit_rmb: number | null
+  profit_status: string
+}
+
 export interface ProfitabilityReport {
+  pool?: ProfitabilityPoolSummary
   revenue_usd: number
   topup_revenue_usd: number
   manual_income_usd: number
@@ -47,6 +87,13 @@ export interface ProfitabilityReport {
   account_purchase_count: number
   sub_usage_status: string
   sub_usage_error?: string
+  available_channels: ProfitabilityAvailableChannel[]
+  scope: 'selected' | 'all'
+  selected_channel_ids: number[]
+  profit_status: ProfitabilityStatus
+  matched_requests: number
+  unmatched_requests: number
+  unmatched_sub_usage_usd: number
   channels: ProfitabilityChannel[]
   models: ProfitabilityModel[]
   accounts: ProfitabilityAccount[]
@@ -72,6 +119,9 @@ export interface ProfitabilityReport {
 export interface ProfitabilityChannel {
   id: number
   name: string
+  status: number
+  profit_status: ProfitabilityStatus
+  purchase_recorded: boolean
   purchase_rmb: number
   sub_usage_usd: number
   customer_charge_rmb: number
@@ -87,6 +137,7 @@ export interface ProfitabilityModel {
   customer_charge_rmb: number
   allocated_cost_rmb: number
   estimated_profit_rmb: number | null
+  profit_status?: ProfitabilityStatus
 }
 
 export interface ProfitabilityAccount {
@@ -98,15 +149,23 @@ export interface ProfitabilityAccount {
 export interface ProfitabilityGroup {
   name: string
   ratio: number
+  configured_ratio?: number | null
   customer_usd: number
   self_usd: number
   profitable: boolean
-  profit_status: string
+  profit_status:
+    | ProfitabilityStatus
+    | 'profit'
+    | 'loss'
+    | 'break_even'
+    | 'unknown'
   sub_usage_usd?: number
   allocated_cost_rmb?: number
   customer_charge_rmb?: number
   estimated_profit_rmb?: number | null
   break_even_ratio?: number | null
+  all_calls?: ProfitabilityGroupCallComparison
+  customer_calls?: ProfitabilityGroupCallComparison
 }
 
 export interface ProfitabilityTimeRange {
@@ -123,49 +182,29 @@ export interface ProfitabilityEntryRequest {
   note?: string
 }
 
-const EMPTY_REPORT: ProfitabilityReport = {
-  revenue_usd: 0,
-  topup_revenue_usd: 0,
-  manual_income_usd: 0,
-  admin_adjustment_usd: 0,
-  account_cost_rmb: 0,
-  sub_usage_usd: 0,
-  cost_rate_rmb_per_usd: 0,
-  account_count: 0,
-  account_purchase_count: 0,
-  sub_usage_status: 'not_configured',
-  channels: [],
-  models: [],
-  accounts: [],
-  unmatched_sub_requests: 0,
-  cash_received_rmb: 0,
-  cash_recognized_rmb: 0,
-  cash_profit_rmb: null,
-  call_charge_rmb: 0,
-  estimated_profit_rmb: null,
-  groups: [],
-  usage: {
-    quota: 0,
-    amount_usd: 0,
-    customer_usd: 0,
-    self_usd: 0,
-    request_count: 0,
-    token_count: 0,
-    users: [],
-    groups: [],
-  },
-}
-
 export async function getProfitabilitySummary(
-  range: ProfitabilityTimeRange
+  range: ProfitabilityTimeRange,
+  revenueBasis: ProfitabilityRevenueBasis = 'calls',
+  channelIds?: number[]
 ): Promise<ProfitabilityReport> {
+  const normalizedChannelIds = channelIds
+    ? [...new Set(channelIds)].sort((left, right) => left - right)
+    : undefined
   const res = await api.get('/api/profitability/summary', {
     params: {
       start_timestamp: range.startTimestamp || undefined,
       end_timestamp: range.endTimestamp || undefined,
+      revenue_basis: revenueBasis,
+      channel_ids:
+        revenueBasis === 'calls' && normalizedChannelIds !== undefined
+          ? normalizedChannelIds.join(',')
+          : undefined,
     },
   })
-  return res.data?.data ?? EMPTY_REPORT
+  if (!res.data?.success || !res.data?.data) {
+    throw new Error(res.data?.message || 'Failed to load profitability report')
+  }
+  return res.data.data
 }
 
 export async function addProfitabilityEntry(

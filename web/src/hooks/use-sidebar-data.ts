@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   ListTodo,
   MessageSquare,
+  BookOpen,
   Radio,
   ServerCog,
   Settings,
@@ -58,6 +59,12 @@ export function useSidebarData(): SidebarData {
             title: t('Playground'),
             url: '/playground',
             icon: FlaskConical,
+          },
+          {
+            title: t('Tavern'),
+            url: '/tavern',
+            configUrls: ['/playground'],
+            icon: BookOpen,
           },
           {
             title: t('Chat'),

@@ -2,6 +2,150 @@
 
 ## Current Status
 
+- US profitability deployment preflight (2026-10-01): production remains
+  healthy on `v1.0.0-rc.28-custom-profitability-20260930.2`; no deployment or
+  restart occurred. The exact old binary is retained, but its source baseline
+  is unverified (`c5a2846e858922d5620dde44e9032e4bd8c99613`, modified tree).
+  Known release metadata does not contain the source snapshot. Do not assume
+  the current dirty checkout or the September 28 Git snapshot reproduces it.
+  Resume after recovering a verifiable baseline or separately approving
+  review/release of the broader local version.
+  Follow-up authenticated GitHub check confirmed both private backups exist:
+  `Yi-sama/new-api-custom/main` is `2ec1006`, last pushed September 28;
+  `Yi-sama/sub2api-custom` has `main=b990204` and
+  `statekit-v0.2.8-test=e956d90`. The New API snapshot omits the current
+  per-group backend/ledger files and the enabled-only purchase selector.
+  This is a release-scope gap, not an absence of Git backups.
+
+- Video Studio refresh follow-up (2026-10-01): the static route now sends
+  `Cache-Control: no-cache`; the host uses `/video-canvas/video?v=2` once to
+  retire the old unversioned entry cached without that policy. Port 3000
+  was rebuilt/restarted with the same isolated preview.db; HTTP checks
+  confirm the new host bundle, current Canvas entry and conditional 304
+  cache policy. The identical executable on 3117 passed normal reload and
+  dashboard-return UI checks. The user's authenticated Edge view could not
+  be inspected because the connector rejects the current API-key auth mode;
+  its exact old-cache cause and final user acceptance remain unconfirmed.
+  Backup: `G:\new-api-video-runtime\before-entry-refresh-20261001-143929`.
+  Original database, production and the 3107 dev process remain untouched.
+
+- Video Studio navigation follow-up (2026-10-01): the managed Canvas header
+  now starts with a dashboard-return control. Its wallet balance is a
+  rightmost 8px-rounded rectangle after the account menu and remains visible
+  on phones. Mobile docs entry moves into the account menu. Canvas assets
+  were initially rebuilt in the shared G: dist only; no host rebuild/server restart,
+  database write or billing change. Desktop light/dark and 320/390px layouts
+  plus return navigation passed; final visual acceptance remains pending.
+
+- 2026-10-01 (Asia/Shanghai) local profitability now shows an independent
+  table row for each active group: current configured rate, charges,
+  attributed Sub usage, charge/Sub ratio, and estimated group break-even.
+  Break-even reconstructs a rate-one revenue basis from historical applied
+  call rates, not today's setting. Channel-local Sub shares allocate purchase
+  cost once; switching administrator scope does not remove cost. All-call
+  break-even is an all-calls-paid comparison, while operating profit always
+  excludes administrator/gift income. Missing history, pricing overrides,
+  incomplete attribution/procurement and cash mode keep break-even unknown.
+  26 UI/API tests, targeted Go tests, type/lint/format and sequential builds
+  pass. Desktop/mobile synthetic UI checks pass; user and real-data acceptance
+  remain pending. New fixture preview: `http://127.0.0.1:3116/dashboard/profitability`.
+  The old 3106 fixture process remains unchanged and has no group data.
+  Not deployed; see `docs/progress/2026-10-01.md` and today's debug record.
+  Follow-up: configured rate now sits immediately before Status, after
+  estimated group break-even; 27 UI/API tests and local layout checks pass.
+  Purchase-entry follow-up: only enabled channels are offered for new account
+  costs; disabled statistical history stays available. 29 UI/API tests and
+  type/lint/format checks pass; not built or deployed in this follow-up.
+
+- The user approved the upstream Infinite Canvas UI and resumed LOCAL
+  integration. `/video-studio` now has no outer title/account bar. The
+  original Canvas navigation includes a compact account menu and desktop
+  balance link. Wallet/profile/usage/task/pricing open the same New API;
+  return and confirmed logout use the host application.
+- Balance is read from `/api/user/self`, formatted with New API's existing
+  currency helper, and synchronized to its shared account cache. Trusted
+  Canvas events trigger refresh after generation and terminal video status;
+  focus refreshes after recharge. No separate wallet or price calculation.
+- Fixed `/video-canvas` in the Rsbuild proxy. Live GET on port 3107 now
+  returns Canvas assets, not the New API dev entry. This was the loading
+  screen root cause; its regression test failed before the fix.
+- Dedicated synthetic preview: `http://localhost:3117/video-studio`,
+  runtime/database under `G:\new-api-video-runtime\native-preview\verification`.
+  It contains no copied provider keys. Its displayed $200 is fixture credit,
+  not the user's real balance. Desktop 1280x720 and mobile 390x844 UI and
+  native return-to-dashboard were observed. Paid generation remains untested.
+- The owned account-snapshot preview at `http://localhost:3000/video-studio`
+  has been rebuilt/restarted with the native UI. Use the existing local
+  account credentials; it still runs against isolated `preview.db` as slave.
+  Both preview JS/CSS fingerprint paths match the final build. The original
+  `.local-tests/abc-shared.db` remains untouched. Keep paid acceptance out of
+  this slave preview; real channels may still be called by clicking generate.
+- Final validation: 18 New API UI tests, 6 Canvas tests, scoped Go billing
+  tests, both typechecks/builds and scoped New API lint/format passed.
+  Native menu return, confirmed logout, and new-tab same-account wallet
+  were browser-tested. User visual acceptance and real async generation,
+  content download, live provider pricing/refunds remain pending.
+- Retained upstream source:
+  `G:\infinite-canvas-original-preview\source\basketikun-infinite-canvas-dab19ad`.
+  Rejected account-header backup:
+  `G:\infinite-canvas-original-preview\paused-account-integration`.
+  No US server operations are authorized by this integration request.
+
+- 2026-09-30 local Tavern is implemented in `web/src/features/tavern`,
+  `web/src/stores/tavern-store.ts`, and the authenticated `/tavern` route.
+  It reuses Playground session-authenticated billing; no Tavern backend,
+  token store, or separate balance exists. Browser records use
+  `new-api:tavern:<userId>` and do not sync between devices/origins.
+  Character import is JSON only, with basic V1/V2/V3 field support;
+  unsupported extensions are retained, not executed.
+  The user's follow-up requires a standalone full-viewport page: no console
+  header/sidebar and no iframe, with a return link to the dashboard.
+  Balance/groups/models refresh on mount and refocus. Account responses
+  synchronize the current user's shared auth cache so dashboard balances
+  and counters do not remain stale after Tavern use; chat completion also
+  refreshes server balance. No frontend wallet ledger exists.
+- Tavern source preview runs at `http://localhost:3107/tavern`, proxying
+  `/api` and `/pg` to the already-running local port-3000 preview.
+  The port-3000 process observed during this task was
+  `G:\new-api-video-runtime\new-api-video.exe`; it was not restarted.
+  The standalone follow-up passed 38 affected tests, source/build checks,
+  and browser checks at 1440x900 and 390x844 using the synthetic fixture.
+  User acceptance and real provider billing remain pending; do not describe
+  the synthetic reply as proof of actual charging.
+  The later account-sync change passed 39 relevant tests and build checks.
+  Real port-3107 browser verification currently requires signing in with a
+  local account. Its balance/chat endpoints reject anonymous calls with 401.
+  Synthetic port-3110 screenshots ($1 test balance) are not real account data.
+
+- 2026-09-30 expanded local retirement audit: exact full paths and restore
+  evidence are in `docs/local-cleanup-paths-2026-09-30.md`. After formal
+  approval, removed three GitHub-backed publishing copies, the empty backup
+  directory, and two old Go caches: 16,598 files, 2.21 GiB logical size.
+  Retained Git state, 834 other local-test files, databases/secrets, and nine
+  duplicate-preservation hashes were verified unchanged before doc updates.
+  Active main, distinct rc28/quality changes, data, and linked owners remain.
+- US read-only inspection found New API running the September 30
+  profitability executable, whereas the custom GitHub main snapshot
+  remains September 28 (`2ec1006`). Deployment and full source backup are
+  separate facts; do not infer all current local work is already pushed.
+- 2026-09-28 local cleanup: `new-api`, `new-api-rc28`, and
+  `new-api-turnstile-deploy` share this repository's `.git`; do not delete
+  the owner while linked worktrees are needed. Four redundant branches and
+  three absent-worktree registrations were removed.
+- `.local-tests` is NOT disposable as a whole. Local startup scripts use
+  `abc-shared.db` and `image-studio-session-secret` there; it also holds
+  backups and Studio fixtures. These live files remain present and the local
+  health check passed after cleanup.
+- About 4.48 GiB of logical file content was removed: old binaries, main
+  `web/dist`, and dependencies in the two older New API worktrees. Three
+  tracked `bin` scripts accidentally included in the list were restored
+  from the index and verified. Main dependencies and the shared junction remain.
+  Rebuild frontend assets before a future source build.
+- Verified GitHub snapshots are not complete current-state backups:
+  `new-api-custom:2ec1006` differs from seven current files before this journal
+  update; `sub2api-custom:b990204` omits three source/documentation files
+  retained in the original checkout. See today's local cleanup audit.
+
 - 2026-09-28 v23 is deployed with per-user image model/size preferences via
   the existing Open WebUI user settings API (`ui.newApiImageModel`,
   `ui.newApiImageSize`). Fresh chats restore preferences; explicit draft
@@ -235,6 +379,19 @@
 - Profitability planning calculator is integrated into the existing admin Dashboard at `/dashboard/profitability`. It is frontend-only, uses monthly scenario inputs, does not persist data, and is served by the same port-3000 executable. Backup before the restart: `.local-tests/profitability-before-20260922-1445/new-api-local-b-c.exe`.
 - 2026-09-25 profitability dashboard implementation now records RMB account purchase costs by New API channel, reads Sub2API admin usage automatically, and correlates usage through `client:<request_id>` from `X-Client-Request-ID`. It has call-charge and cash-received views; unmatched New API/Sub2API usage keeps profit unknown. The current local startup script still does not set `SUB2API_BASE_URL` or `SUB2API_ADMIN_API_KEY`, so live Sub synchronization is pending configuration.
 - 2026-09-25 follow-up: profitability build is now deployed at the original `http://localhost:3000/dashboard/profitability` with the original SQLite database; backup is `.local-tests/profitability-deploy-backup-20260925-140442/`. A prior isolated preview on port 3102 was intentionally stopped. The deployment process briefly hit a `Stop-Process` object error and a PowerShell startup `OutOfMemoryException`; both occurred before binary replacement. The verified old PID was then stopped using .NET `Process.Kill`, and the new PID 45052 passed HTTP and database checks.
+- 2026-09-30 US profitability: channel multi-selection with per-user browser persistence is deployed, together with the two missing PostgreSQL columns and a root-only Sub2API environment file. `NODE_TYPE=slave` remains unchanged; only `new-api` restarted. Original backup: `/opt/us-whitelist/backups/profitability-20260930-161100/`; second pre-update backup: `/opt/us-whitelist/backups/profitability-20260930-162748/`. Current executable SHA-256: `3b37cfbd261c7c8fa157f4d35f6d50cd2d7bfd0f5f2f0f41b305cce129c5453f`, version `v1.0.0-rc.28-custom-profitability-20260930.2`.
+- Live Sub2API usage must be paged using `sort_by=id&sort_order=asc`: descending offset pages overlap while new calls arrive. This fix is deployed and real authenticated reconciliation now reports connected. A temporary build failure in concurrent video work resolved when that work supplied its missing function; no video files were changed by the profitability task. At final verification, channels 4/32/34 matched 4,087 calls, but 26,840 old calls remained unmatched and procurement was absent, so profit correctly remained unknown. Signed-in production UI and real procurement acceptance remain pending. See `docs/progress/2026-09-30.md` and `docs/debug/2026-09-30-debug.md`.
+
+- 2026-09-30 local profitability follow-up: the user chose whole-pool totals and administrator-inclusive/customer-only comparisons, not model purchase-cost allocation. The new `pool` API separates gross call charges from paid customer income and procurement profit. Unknown role attribution leaves customer Sub usage null; raw total ratios use `unverified_scope`, known excluded-channel usage uses `scope_mismatch`, and cash-global mode uses `cash_scope` with no pool ratio. This follow-up is local and is not the deployed `20260930.2` release. Frontend integration, focused tests, builds, and synthetic desktop/mobile browser checks passed; user and real-data acceptance remain pending. Preview: `http://127.0.0.1:3106/dashboard/profitability` (synthetic, procurement writes disabled). See today's profitability progress section. Historical admin classification uses currently stored roles, including soft-deleted users, not a role-at-call snapshot.
+- Historical, superseded by the October 1 per-group table: cost-basis group
+  break-even was added to this local ledger on 2026-09-30:
+  full recorded purchase cost / selected call-scope Sub usage, under the 1:1
+  numeric convention. Customer-only mode keeps all procurement costs and
+  excludes administrator upstream usage. The metric is not a configured
+  per-model/group pricing recommendation or a paid-income profit assertion;
+  gift/admin charges remain excluded from operating income. Incomplete scope
+  or procurement, zero usage, and cash mode produce an unknown metric.
+  Local tests/build and desktop/mobile fixture checks passed; not deployed.
 
 - Auto 已实现并于 2026-09-21 部署到美国服务器；自动检查、本地运行和线上健康检查通过，尚未使用真实上游完成端到端计费验收。
 - Redis 重启后限流持续返回 `NOSCRIPT` 的根因已修复并于 2026-09-21 部署；限流脚本现在通过 go-redis `Script.Run` 在 `EVALSHA` 缓存丢失时自动回退到 `EVAL`，无需重启 New API。
@@ -243,6 +400,41 @@
 - 当前旧库没有有效的 `AutoGroups` 配置时，Auto 会回退到用户可用的全部真实分组，并按分组倍率从低到高排序。
 
 ## Decisions
+
+### Local Video Studio (2026-09-30)
+
+- Video Studio is implemented in this existing local checkout and the sibling
+  `infinite-canvas` source pinned to v0.19.0 / `dab19adc0847e32e39b7fc8ff90cb392561fb826`.
+  No SSH or production change was part of this work.
+- Entry: `http://localhost:3000/video-studio`; launcher:
+  `start-local-video-studio.ps1`. It uses `G:\new-api-video-runtime\preview.db`,
+  a one-time SQLite snapshot of `.local-tests\abc-shared.db`, and binds only
+  `127.0.0.1`. Users/channels/tokens/options matched the source after startup.
+- The user requested a separate page: `/video-studio` bypasses the dashboard
+  shell while retaining the authenticated route. The original Canvas
+  navigation contains return/account actions; no host header is rendered.
+  Canvas remains a same-origin iframe.
+- The preview is a slave with background task updates disabled to prevent
+  automatic use of copied provider credentials. Paid generation acceptance
+  requires a separately controlled master environment; do not interpret
+  the running preview as an end-to-end provider/billing sign-off.
+- Dashboard identity is handed to Canvas as an in-memory purpose-scoped
+  token. The backend revalidates its login session and reuses the user's
+  default group, existing relay billing, task ownership, and downloads.
+- Canvas projects/media/history are browser-local and per-user namespaced,
+  not cloud-synced. Custom provider scripts/proxies/plugins and the local
+  CLI Agent are disabled in the managed build.
+- Build/runtime/cache paths, exact commands, source provenance, limitations,
+  and rollback are recorded in `ops/video-studio/README.md`.
+- Focused Go tests, 9 New API UI tests, 3 Canvas tests, both typechecks,
+  frontend builds, and the Go executable build passed. Browser connection
+  recovered; desktop login/model/canvas/reload checks and standalone-page
+  navigation passed. The 390x844 post-fix mobile check passed, including
+  parameter/navigation drawers and absence of horizontal form overflow.
+- Standalone preview executable backup:
+  `G:\new-api-video-runtime\new-api-video-before-standalone-20260930-172127.exe`.
+  The preview was restarted using the same isolated database; real-provider
+  generation, settlement, and user acceptance remain pending.
 
 - Keep existing Open WebUI status, active-user display, calendar, automation, exploration and other features unless explicitly requested otherwise. Integration priorities are New API username consistency, unified logout/session handling, and user-scoped groups/models/billing. Do not treat the online-count UI addition as completion of those integrations.
 - User approved durable API tracking but requested local implementation before any server changes. New `last_api_call_at` and `api_activity_started_at` user columns record authenticated API requests independently of consumption logs. Migration starts a fresh observation window for historical users; unknown history is not proof of inactivity.
@@ -302,6 +494,16 @@
 - 回滚时恢复该备份目录中的 `docker-compose.yml`，再执行 `docker compose -f /opt/us-whitelist/docker-compose.yml -p us-whitelist up -d --no-deps --force-recreate new-api`。
 
 ## Durable Debug Findings
+
+- Local cleanup audit on 2026-09-30: `.local-tests/channel-status-go-cache`
+  and `.local-tests/channel-status-go-tmp` were removed after formal approval,
+  clearing approximately 2.06 GiB of old Go build artifacts. Earlier policy
+  blocks are historical. Do not delete all of `.local-tests`: its databases,
+  session secrets, backups, and fixtures remain and were verified unchanged.
+- The parent workspace contains dirty test-named checkouts and linked Git
+  worktrees. Names such as `test`, `reference`, or `staging` are not evidence
+  that a whole directory is disposable. See the September 28 and 30 progress
+  entries for the cleanup audit and preservation decisions.
 
 - 2026-09-23 US first-token investigation: host resources and the Nginx/Cloudflare ingress path were fast and healthy. The deployed `new-api` executable is a read-only host bind mount under `/opt/proxy/newapi/releases/20260922-1655-local3000-73BC11F5/new-api`, not the image's internal executable.
 - `other.frt` is recorded when the upstream SSE scanner sees its first non-empty `data:` event, before downstream response conversion. In the checked 24-hour window, valid FRT samples had a 10.8 s median, 39.5 s P90, and 56.7 s P95; large prompts and `xhigh` reasoning correlated with higher latency.
