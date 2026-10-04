@@ -286,7 +286,7 @@ def patch_images(source: str, path: Path) -> str:
     source = replace_once(
         path, source,
         "    size = '512x512'\n",
-        "    if bridge_enabled() and image_config.IMAGE_GENERATION_ENGINE == 'openai' and form_data.size:\n"
+        "    if bridge_enabled() and image_config.IMAGE_GENERATION_ENGINE == 'openai':\n"
         "        form_data.size = bridge_image_generation_size(form_data.model, size=form_data.size)\n\n"
         "    size = '512x512'\n",
         'image size validation before width and height parsing',

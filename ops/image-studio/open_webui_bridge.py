@@ -95,9 +95,14 @@ _FIXED_IMAGE_SIZES = {
     'dall-e': ('1024x1024', '512x512', '256x256'),
     'dall-e-3': ('1024x1024', '1792x1024', '1024x1792'),
 }
+# Web adapter sizes are request hints, not guaranteed output dimensions.
+_WEB_IMAGE_MODEL = 'gpt-image-2.5-web'
+_WEB_IMAGE_DEFAULT_SIZE = '512x512'
 
 
 def bridge_image_size_options(model: str) -> list[dict]:
+    if model == _WEB_IMAGE_MODEL:
+        return [{'value': '1:1', 'size': _WEB_IMAGE_DEFAULT_SIZE}]
     sizes = (
         ('1024x1024', '1536x1024', '1024x1536', '1152x864', '864x1152', '1536x864', '864x1536')
         if model in _CUSTOM_SIZE_MODELS else _FIXED_IMAGE_SIZES.get(model, ())
@@ -121,11 +126,13 @@ def bridge_image_generation_size(model: str, features=None, size=None, aspect_ra
             raise HTTPException(status_code=400, detail=f'Invalid image {label}: {value}.')
         return tuple(map(int, match.groups()))
 
+    if model == _WEB_IMAGE_MODEL and size == 'auto':
+        size = None
     explicit = size not in (None, '') or aspect_ratio not in (None, '')
     if not explicit:
         selection = features.get('image_generation_size') if isinstance(features, dict) else None
         if selection in (None, '', 'auto'):
-            return None
+            return _WEB_IMAGE_DEFAULT_SIZE if model == _WEB_IMAGE_MODEL else None
         if isinstance(selection, str) and (':' in selection or '\uff1a' in selection):
             aspect_ratio = selection
         else:

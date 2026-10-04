@@ -508,3 +508,24 @@
 - 2026-09-23 US first-token investigation: host resources and the Nginx/Cloudflare ingress path were fast and healthy. The deployed `new-api` executable is a read-only host bind mount under `/opt/proxy/newapi/releases/20260922-1655-local3000-73BC11F5/new-api`, not the image's internal executable.
 - `other.frt` is recorded when the upstream SSE scanner sees its first non-empty `data:` event, before downstream response conversion. In the checked 24-hour window, valid FRT samples had a 10.8 s median, 39.5 s P90, and 56.7 s P95; large prompts and `xhigh` reasoning correlated with higher latency.
 - Channel 32 had a separate burst of 502 `Upstream service temporarily unavailable` failures on 2026-09-23, typically after about 5.2-5.6 s. Do not treat those failures as an Nginx or host-memory issue without checking the channel's upstream/proxy path.
+
+## Studio Web Image Size Policy: 2026-10-03
+
+- Owner-selected policy: only `gpt-image-2.5-web` uses 512x512 for Auto,
+  omitted size, and 1:1. The shared backend helper publishes the corresponding
+  menu option. Exact pixel requests retain their original dimensions; other
+  models and unsupported-ratio confirmation behavior remain unchanged.
+- Active US backend overlay:
+  `/opt/image-studio/releases/20261003-web-image-512-v28/backend.override.json`,
+  appended to all existing Compose files, including the v27 frontend.
+  Keep both backend mounts for later container recreations. The matching local
+  source changes are in `ops/image-studio/open_webui_bridge.py` and
+  `patch_open_webui.py`; no image rebuild was required this round.
+- Rollback: release `before/rollback.sh`; exact prior merged configuration
+  and original helper/router are also stored privately in `before/`.
+  Do not overwrite a newer frontend release when applying or rolling back.
+- Studio startup took about 100 seconds even on the original image; use the
+  existing 360-second readiness window rather than a 75-second deadline.
+  Forty-five container checks and active policy/health pass. Owner browser
+  generation remains pending; request size does not guarantee actual web
+  output dimensions.

@@ -151,6 +151,19 @@ class NativeImageToolTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result['status'], 'success')
             self.assertEqual(self.sent[-1][-1], expected)
 
+    async def test_web_model_auto_menu_and_square_tool_argument_reach_generation(self):
+        tools = await self.tools({
+            'image_generation': True, 'image_generation_model': 'gpt-image-2.5-web',
+            'image_generation_size': 'auto',
+        })
+        generate = tools['generate_image']['callable']
+        for args, expected in (({}, '512x512'), ({'aspect_ratio': '1:1'}, '512x512'),
+                               ({'size': '1024x1024'}, '1024x1024')):
+            result = json.loads(await generate(prompt='test', **args))
+            self.assertEqual(result['status'], 'success')
+            self.assertEqual(self.sent[-1][2], 'gpt-image-2.5-web')
+            self.assertEqual(self.sent[-1][-1], expected)
+
     async def test_unsupported_dimensions_cannot_silently_retry_different_size(self):
         tools = await self.tools({'image_generation': True, 'image_generation_model': 'gpt-image-2'})
         generate = tools['generate_image']['callable']
@@ -308,6 +321,17 @@ class ImageSizePayloadTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(size=size), self.assertRaises(bridge.HTTPException):
                 await self.generate_image(model='gpt-image-2', size=size)
         self.assertEqual(self.outbound, [])
+
+    async def test_web_default_reaches_relay_even_when_admin_defaults_differ(self):
+        self.config.IMAGE_SIZE = '1536x1024'
+        for requested, expected in ((None, '512x512'), ('auto', '512x512'),
+                                    ('512x512', '512x512'), ('1024x1024', '1024x1024')):
+            with self.subTest(requested=requested):
+                execution = {}
+                await self.generate_image(model='gpt-image-2.5-web', size=requested, execution=execution)
+                self.assertEqual(self.outbound[-1]['json']['model'], 'gpt-image-2.5-web')
+                self.assertEqual(self.outbound[-1]['json']['size'], expected)
+                self.assertEqual(execution['size'], expected)
 
     async def test_inline_image_wins_over_url_and_reaches_file_upload(self):
         self.response_data['data'][0]['url'] = 'https://image.invalid/expired'

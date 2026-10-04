@@ -43,6 +43,28 @@ class ImageSizeTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             resolve('custom-gpt-image-2', aspect_ratio='4:3')
 
+    def test_web_model_auto_and_square_request_use_owner_default(self):
+        model = 'gpt-image-2.5-web'
+        for features in (None, {}, {'image_generation_size': ''}, {'image_generation_size': 'auto'}):
+            with self.subTest(features=features):
+                self.assertEqual(resolve(model, features), '512x512')
+        self.assertEqual(resolve(model, size='auto'), '512x512')
+        self.assertEqual(resolve(model, {'image_generation_size': '1:1'}), '512x512')
+        self.assertEqual(resolve(model, {'image_generation_size': 'auto'}, aspect_ratio='1:1'), '512x512')
+        self.assertEqual(resolve(model, aspect_ratio='２：２'), '512x512')
+        self.assertEqual(bridge_legacy_image_size(model, {}, 'draw 1:1'), '512x512')
+        self.assertEqual(bridge_legacy_image_size(model, {'image_generation_size': 'auto'}, 'draw a picture'), '512x512')
+
+    def test_web_default_preserves_explicit_pixels_and_rejects_unestablished_ratios(self):
+        model = 'gpt-image-2.5-web'
+        self.assertEqual(resolve(model, {'image_generation_size': '1:1'}, size='1024x1024'), '1024x1024')
+        self.assertEqual(resolve(model, size='1980x1200'), '1980x1200')
+        self.assertEqual(resolve(model, size='768x768', aspect_ratio='1:1'), '768x768')
+        self.assertIsNone(resolve(model + '-other', {'image_generation_size': 'auto'}))
+        for args in ({'aspect_ratio': '4:3'}, {'size': '1024x768', 'aspect_ratio': '1:1'}):
+            with self.subTest(args=args), self.assertRaises(HTTPException):
+                resolve(model, **args)
+
     def test_pixel_sizes_remain_exact_or_fail_before_request(self):
         self.assertEqual(resolve('gpt-image-2', size='1984x1200'), '1984x1200')
         self.assertEqual(resolve('gpt-image-2', size='3840x2160'), '3840x2160')
@@ -62,7 +84,7 @@ class ImageSizeTests(unittest.TestCase):
             resolve('custom', size='1980x1200', aspect_ratio='4:3')
 
     def test_offered_options_roundtrip_through_the_same_backend_policy(self):
-        for model in ('gpt-image-2', 'gpt-image-1', 'dall-e-2', 'dall-e-3'):
+        for model in ('gpt-image-2', 'gpt-image-1', 'dall-e-2', 'dall-e-3', 'gpt-image-2.5-web'):
             offered = options(model)
             self.assertGreater(len(offered), 0)
             for option in offered:
