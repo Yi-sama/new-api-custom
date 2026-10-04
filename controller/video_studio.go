@@ -153,7 +153,12 @@ func GetVideoStudioModels(c *gin.Context) {
 			continue
 		}
 		for _, entryModel := range entry.Models {
-			models = append(models, gin.H{"id": entryModel.ID, "object": "model", "created": 0, "owned_by": "new-api"})
+			for _, capability := range entryModel.Capabilities {
+				if capability == "video" {
+					models = append(models, gin.H{"id": entryModel.ID, "object": "model", "created": 0, "owned_by": "new-api"})
+					break
+				}
+			}
 		}
 		break
 	}

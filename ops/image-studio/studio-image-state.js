@@ -21,6 +21,17 @@ export function saveImagePreference(name, value) {
   if (!field) return Promise.reject(new Error('Unknown image preference'))
   const normalized = name === 'model' ? (typeof value === 'string' && value ? value : null) :
     (typeof value === 'string' && value ? value : 'auto')
+  return savePreference(field, normalized)
+}
+
+export function saveChatModels(value) {
+  if (!Array.isArray(value) || !value.length || value.some((model) => typeof model !== 'string' || !model)) {
+    return Promise.resolve()
+  }
+  return savePreference('models', [...value])
+}
+
+function savePreference(field, normalized) {
   const token = localStorage.token
   const save = preferenceSave.catch(() => {}).then(async () => {
     const response = await fetch('/api/v1/users/user/settings/update', {

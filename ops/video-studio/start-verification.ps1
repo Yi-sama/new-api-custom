@@ -23,6 +23,7 @@ $env:ENABLE_PPROF = 'false'
 $env:CHANNEL_UPSTREAM_MODEL_UPDATE_TASK_ENABLED = 'false'
 $env:SESSION_SECRET = 'video-studio-isolated-fixture-not-for-production'
 $env:VIDEO_STUDIO_DIST_DIR = (Resolve-Path -LiteralPath $CanvasDist).Path
+$env:VIDEO_STUDIO_DATA_DIR = Join-Path $fixtureRoot 'studio-data'
 $process = Start-Process -FilePath (Join-Path $RuntimeRoot 'new-api-video.exe') `
     -WorkingDirectory $fixtureRoot -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput (Join-Path $fixtureRoot 'server.stdout.log') `
@@ -69,6 +70,18 @@ if (-not ($channels.data.items | Where-Object name -eq 'Local video verification
     } | ConvertTo-Json -Depth 5
     $result = Invoke-RestMethod "$base/api/channel/" -Method Post -Headers $headers -ContentType 'application/json' -Body $body
     if (-not $result.success) { throw "Fixture channel setup failed: $($result.message)" }
+}
+$metadata = Invoke-RestMethod "$base/api/models/?p=1&page_size=100" -Headers $headers
+if (-not ($metadata.data.items | Where-Object model_name -eq 'sora-2')) {
+    $body = @{
+        model_name = 'sora-2'
+        status = 1
+        sync_official = 0
+        name_rule = 0
+        endpoints = '{"openai-video":{"path":"/v1/videos","method":"POST"}}'
+    } | ConvertTo-Json
+    $result = Invoke-RestMethod "$base/api/models/" -Method Post -Headers $headers -ContentType 'application/json' -Body $body
+    if (-not $result.success) { throw "Fixture model metadata setup failed: $($result.message)" }
 }
 $session = Invoke-RestMethod "$base/api/video-studio/session" -Method Post -Headers $headers
 if (-not $session.success -or -not $session.data.token) { throw 'Fixture Video Studio session failed.' }

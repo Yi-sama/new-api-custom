@@ -139,6 +139,10 @@ func GetImageStudioIdentity(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
+	if _, _, err := model.ClaimImageStudioCredit(user.Id); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 	c.Header("X-Studio-Email", email)
 	c.Header("X-Studio-Name", url.PathEscape(sanitizeStudioName(user.Username, user.Id)))
 	c.Header("X-Studio-Role", role)
@@ -170,6 +174,11 @@ func GetImageStudioBilling(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
+	credit, _, err := model.ClaimImageStudioCredit(user.Id)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 	remaining, err := model.GetUserQuota(user.Id, false)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -181,11 +190,13 @@ func GetImageStudioBilling(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"remaining_quota":   remaining,
-		"used_quota":        used,
-		"display_type":      operation_setting.GetQuotaDisplayType(),
-		"quota_per_unit":    common.QuotaPerUnit,
-		"usd_exchange_rate": operation_setting.USDExchangeRate,
+		"remaining_quota":           remaining,
+		"used_quota":                used,
+		"studio_gift_quota":         credit.Quota,
+		"studio_gift_granted_quota": credit.GrantedQuota,
+		"display_type":              operation_setting.GetQuotaDisplayType(),
+		"quota_per_unit":            common.QuotaPerUnit,
+		"usd_exchange_rate":         operation_setting.USDExchangeRate,
 	})
 }
 

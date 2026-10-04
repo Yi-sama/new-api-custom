@@ -107,6 +107,110 @@ func TestSystemTaskSchedulerSkipsDisabled(t *testing.T) {
 	assert.Equal(t, int64(0), countSystemTasks(t, handler.taskType))
 }
 
+func TestSystemTaskSchedulerHonorsExplicitTypeScope(t *testing.T) {
+	truncate(t)
+	t.Setenv("SYSTEM_TASK_TYPES", "\r\nvideo_studio_jobs,\tasync_task_poll\r\n")
+	withSystemTaskRegistry(t,
+		&stubScheduledHandler{taskType: model.SystemTaskTypeVideoStudio, enabled: true, interval: time.Minute},
+		&stubScheduledHandler{taskType: model.SystemTaskTypeAsyncTaskPoll, enabled: true, interval: time.Minute},
+		&stubScheduledHandler{taskType: model.SystemTaskTypeChannelTest, enabled: true, interval: time.Minute},
+	)
+
+	runSystemTaskScheduler()
+
+	assert.Equal(t, int64(1), countSystemTasks(t, model.SystemTaskTypeVideoStudio))
+	assert.Equal(t, int64(1), countSystemTasks(t, model.SystemTaskTypeAsyncTaskPoll))
+	assert.Equal(t, int64(0), countSystemTasks(t, model.SystemTaskTypeChannelTest))
+}
+
+func TestSystemTaskClaimPassLeavesExcludedPendingTaskUntouched(t *testing.T) {
+	truncate(t)
+	t.Setenv("SYSTEM_TASK_TYPES", model.SystemTaskTypeVideoStudio)
+	withSystemTaskRegistry(t, &stubScheduledHandler{taskType: model.SystemTaskTypeChannelTest})
+	task, err := model.CreateSystemTask(model.SystemTaskTypeChannelTest, nil, nil)
+	require.NoError(t, err)
+
+	runSystemTaskClaimPass("scoped-runner")
+
+	current, err := model.GetLatestSystemTask(model.SystemTaskTypeChannelTest)
+	require.NoError(t, err)
+	require.NotNil(t, current)
+	assert.Equal(t, task.TaskID, current.TaskID)
+	assert.Equal(t, model.SystemTaskStatusPending, current.Status)
+	assert.Empty(t, current.LockedBy)
+}
+
+func TestSystemTaskSchedulerRejectsUnrecognizedScope(t *testing.T) {
+	for _, scope := range []string{", ,", "unknown_task"} {
+		t.Run(scope, func(t *testing.T) {
+			truncate(t)
+			t.Setenv("SYSTEM_TASK_TYPES", scope)
+			withSystemTaskRegistry(t, &stubScheduledHandler{
+				taskType: model.SystemTaskTypeChannelTest,
+				enabled:  true,
+				interval: time.Minute,
+			})
+
+			runSystemTaskScheduler()
+
+			assert.Equal(t, int64(0), countSystemTasks(t, model.SystemTaskTypeChannelTest))
+		})
+	}
+}
+
+func TestSystemTaskStaleLockCleanupHonorsExplicitTypeScope(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		scope           string
+		expectedVideo   model.SystemTaskStatus
+		expectedChannel model.SystemTaskStatus
+	}{
+		{"default", "", model.SystemTaskStatusFailed, model.SystemTaskStatusFailed},
+		{"video_only", model.SystemTaskTypeVideoStudio, model.SystemTaskStatusFailed, model.SystemTaskStatusRunning},
+		{"unknown", "unknown_task", model.SystemTaskStatusRunning, model.SystemTaskStatusRunning},
+		{"empty_list", ", ,", model.SystemTaskStatusRunning, model.SystemTaskStatusRunning},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			truncate(t)
+			t.Setenv("SYSTEM_TASK_TYPES", tc.scope)
+			withSystemTaskRegistry(t,
+				&stubScheduledHandler{taskType: model.SystemTaskTypeVideoStudio},
+				&stubScheduledHandler{taskType: model.SystemTaskTypeChannelTest},
+			)
+			now := common.GetTimestamp()
+			for _, taskType := range []string{model.SystemTaskTypeVideoStudio, model.SystemTaskTypeChannelTest} {
+				task, err := model.CreateSystemTask(taskType, nil, nil)
+				require.NoError(t, err)
+				_, claimed, err := model.ClaimSystemTask(task.ID, taskType, "expired-runner", now+60)
+				require.NoError(t, err)
+				require.True(t, claimed)
+			}
+			require.NoError(t, model.DB.Model(&model.SystemTaskLock{}).
+				Where("locked_by = ?", "expired-runner").Update("locked_until", now-1).Error)
+
+			require.NoError(t, runSystemTaskStaleLockCleanup())
+
+			for taskType, expected := range map[string]model.SystemTaskStatus{
+				model.SystemTaskTypeVideoStudio: tc.expectedVideo,
+				model.SystemTaskTypeChannelTest: tc.expectedChannel,
+			} {
+				task, err := model.GetLatestSystemTask(taskType)
+				require.NoError(t, err)
+				require.NotNil(t, task)
+				assert.Equal(t, expected, task.Status)
+				var lockCount int64
+				require.NoError(t, model.DB.Model(&model.SystemTaskLock{}).
+					Where("type = ?", taskType).Count(&lockCount).Error)
+				if expected == model.SystemTaskStatusRunning {
+					assert.Equal(t, int64(1), lockCount)
+				} else {
+					assert.Zero(t, lockCount)
+				}
+			}
+		})
+	}
+}
+
 func TestSystemTaskClaimPassDispatchesByType(t *testing.T) {
 	truncate(t)
 

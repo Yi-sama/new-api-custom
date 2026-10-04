@@ -2,8 +2,9 @@
 
 This integration adds `/video-studio` as a standalone, authenticated page.
 It fills the viewport without the New API dashboard header/sidebar or an
-outer account bar. The original Canvas navigation offers an account menu
-with return to `/dashboard`. The managed Infinite Canvas build is still
+outer account bar. The original Canvas navigation has a leftmost return to
+`/dashboard`, an account menu and a rightmost rounded rectangular balance.
+The managed Infinite Canvas build is still
 served in a same-origin iframe from `/video-canvas/`, with the existing login
 and billing bridge. It does not deploy anything to the US server.
 
@@ -25,21 +26,32 @@ and billing bridge. It does not deploy anything to the US server.
 2. The parent hands a purpose-scoped bearer to the same-origin iframe through
    an origin/source-checked message. It is held in memory, not stored as an
    API key. Its lifetime is capped by the existing 12-hour studio token policy
-   and the login session's expiry. Reload to establish a fresh studio session.
+   and the login session's expiry. The frame requests renewal from its trusted
+   parent without reloading the canvas. Paid submissions are never replayed
+   just because an authentication response or network query failed.
 3. Every bridge request revalidates the login session and reconstructs the
-   current user's relay context. Requests use the user's default group.
+   current user's relay context. Submissions carry the selected, URL-encoded
+   group in `X-New-Api-Group`; the server checks current user access and strips
+   that header before upstream forwarding. Omitted groups use the user default.
    Users do not supply provider keys or select arbitrary channels.
 4. Billable operations reuse existing New API distribution, pricing,
    pre-consumption, settlement/refund, and logs. The synthetic token ID is `0`;
    it does not require a user's persistent API token.
-5. Video submission uses `/api/video-studio/v1/videos`. Polling and downloading
-   use owner-checked task endpoints. Image references use `input_reference`.
+5. Managed image/video submission uses `/api/video-studio/jobs/...` with a
+   user-scoped UUID `Idempotency-Key`. The server persists the request before
+   returning a receipt, then runs the existing billable relay independently of
+   the browser. Video jobs retain the existing New API native task ID.
+   Polling and downloading use owner-checked job endpoints. Image references use `input_reference`.
    Video/audio references and custom provider scripts are not enabled in
    managed mode. Compatibility is limited to the existing New API adapters;
    the model catalog is not a promise that every upstream accepts every option.
-6. Canvas projects, assets, prompts, and local generation history are stored
-   in per-user browser namespaces. This is local persistence, not cloud sync
-   or encryption against someone with access to the browser profile.
+6. Submitted generation jobs and their returned media are stored by New API:
+   `studio_jobs` contains ownership/status, and `VIDEO_STUDIO_DATA_DIR`
+   contains private request/result files. The default directory is
+   `data/video-studio` under the process working directory. Keep it outside
+   the static tree and back it up together with the database.
+   Canvas projects, imported assets, prompts and composition remain browser-local
+   and per-user; this change does not synchronize entire canvases.
 7. The local CLI Agent, provider configuration, proxy configuration, and
    custom plugins are hidden/disabled in managed mode.
 8. A nonvisual parent bridge reads `/api/user/self`, applies the site's
@@ -54,6 +66,45 @@ and billing bridge. It does not deploy anything to the US server.
     revalidate the entry and mutable config. The host uses
     `/video-canvas/video?v=2` to retire the original entry URL previously
     served without a cache policy; this is not the upstream app version.
+11. `GET /api/video-studio/catalog` exposes permitted groups and enabled models
+    with their capabilities. Each page filters this catalog for its purpose:
+    video omits LLM-only groups and non-video models; image/text/audio retain
+    their own options. The same model in two groups remains two distinct choices.
+    Settings and canvas nodes retain group/model identity, not an upstream key.
+12. Video POSTs require the selected group's model to have video capability,
+    before billing. Task status/content GETs use the task owner and stored
+    routing/billing context, not the current catalog or current group selection.
+13. The existing master system-task runner executes `video_studio_jobs` under
+    its existing DB lease. A process interrupted during an ambiguous upstream
+    submission becomes `uncertain`, never automatically resubmitted. Already
+    returned image responses and completed native video tasks can resume media
+    storage without a new charge. Normal failures/refunds still use New API.
+    Multi-node deployments must share this private data directory. Native video
+    completion/settlement also requires the existing `UPDATE_TASK` polling.
+    No new job retention or cleanup policy is enabled.
+
+## Administrator Configuration
+
+Use existing New API usable-group, channel and model-metadata settings.
+The catalog combines supported channel endpoints with model metadata, matching
+New API pricing semantics and exact/prefix/suffix/contains name rules.
+Video requires the `openai-video` endpoint capability, supplied by a supported
+video channel/custom-channel configuration or model metadata. A name containing
+`video`, or a model that can only understand video, is not enough.
+Only enabled abilities/channels with available keys are offered; disabled models,
+disabled channels and groups outside the user's permission are omitted.
+
+The managed frontend loads this catalog when the page opens; reload after an
+administrator changes configuration. An empty video catalog disables its selectors
+and generation button rather than falling back to an LLM.
+
+The existing model editor stores an optional `parameters` JSON profile with
+`image`, `video`, and `groups` overrides. Only explicitly configured options
+are offered in managed generation controls; unknown options are left to the
+upstream default, not guessed from the model name. These profiles are operator
+configuration, not automatic channel-capability discovery. Where multiple
+channels route the same group/model, configure their genuinely shared options.
+Requests are validated again on the server before execution.
 
 ## Build
 
@@ -71,6 +122,7 @@ $env:VITE_NEW_API_STUDIO='1'
 .\node_modules\.bin\tsc.cmd -b
 .\node_modules\.bin\vite.cmd build --outDir G:\infinite-canvas-video-runtime\dist --emptyOutDir
 node --experimental-strip-types --test src/lib/__tests__/new-api-studio.test.mjs
+node --experimental-strip-types --test src/lib/__tests__/studio-account-refresh.test.mjs src/lib/__tests__/studio-catalog.test.mjs src/lib/__tests__/studio-selection.test.mjs
 ```
 
 From New API `web`, build the dashboard before compiling the Go binary,
@@ -89,7 +141,7 @@ From the New API root:
 $env:GOCACHE='G:\new-api-video-go-cache'
 $env:GOTMPDIR='G:\new-api-video-go-tmp'
 $env:GOMAXPROCS='2'
-go test -p 1 ./service ./controller ./router -run '^(TestVideoStudio|TestCreateVideoStudioSession)' -count=1
+go test -p 1 ./service ./controller ./router -run 'Test(VideoStudio|CreateVideoStudio|GetVideoStudio)' -count=1
 go build -p 1 -o G:\new-api-video-runtime\new-api-video.exe .
 .\start-local-video-studio.ps1
 ```
@@ -112,7 +164,7 @@ rebuilds need a browser reload, not a Go rebuild.
   Clicking generation can still call a configured real channel.
 - Logs and the exact process ID are under `G:\new-api-video-runtime`.
 - For an isolated, synthetic account/model catalog, run
-  `.\ops\video-studio\start-verification.ps1`. It uses port 3117 and a separate
+  `.\ops\video-studio\start-verification.ps1`. It uses port 3117 by default and a separate
   database under `verification`, and does not submit generation.
   The native-account preview uses
   `-RuntimeRoot G:\new-api-video-runtime\native-preview`, with a separately compiled
@@ -136,10 +188,11 @@ local launcher and original database. Do not reset the dirty worktree.
 - Go tests cover scoped credentials, real relay submission through a local
   mock upstream, wallet debit, failed-submission refund, and task/content
   ownership. No paid provider is called.
-- Eighteen New API frontend tests cover the dev proxy, native account
+- Twenty-six New API frontend tests cover the dev proxy, native account
   bridge, trusted events, loading/errors, stale-account responses, navigation,
-  session handoff, account switching and shell bypass. Six Canvas tests
-  cover trusted account/session messages, per-user storage and refresh events.
+  session handoff, account switching and shell bypass. Twenty-five Canvas
+  checks cover trusted account/session messages, per-user storage, refresh,
+  model profiles, renewal and durable job recovery.
 - Browser checks passed for login, model selection, creating a canvas/video
   node, and preservation after reload.
 - Standalone-page browser checks passed at 1280x720 and 390x844, including
@@ -154,3 +207,16 @@ local launcher and original database. Do not reset the dirty worktree.
   no outer header, matching video/wallet balance, same-account wallet in a
   new tab, return to dashboard, and confirmed logout to the sign-in page.
   Screenshots use `.codex-runtime/video-studio-native-` at workspace root.
+- Group/model filtering passed focused Go tests and 11 Canvas checks, including
+  selected-group charges, rejected non-video submissions, encoded group names,
+  selection persistence and owner-scoped task access after catalog removal.
+  Desktop browser checks confirmed video-only choices, separate image options,
+  cross-group persistence, and disabled generation with an empty catalog.
+  A real 390x844 browser check now confirms the managed parameter drawer fits
+  without horizontal overflow and applies a saved group override.
+- The current isolated background-job verification preview is
+  `http://localhost:3121/video-studio`, using the synthetic `videotest`
+  account and a local mock provider on port 3108. It completed one image job
+  after the browser was closed and charged the synthetic account once.
+  Port 3000 is currently stopped. No real provider or US-server generation
+  was submitted.

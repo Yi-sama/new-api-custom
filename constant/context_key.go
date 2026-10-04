@@ -40,6 +40,8 @@ const (
 	ContextKeyChannelMultiKeyIndex     ContextKey = "channel_multi_key_index"
 	ContextKeyChannelKey               ContextKey = "channel_key"
 	ContextKeyUpstreamRequestAttempted ContextKey = "upstream_request_attempted"
+	ContextKeyStudioJobID              ContextKey = "studio_job_id"
+	ContextKeyStudioNativeTaskID       ContextKey = "studio_native_task_id"
 	ContextKeyChannelStatusRequestID   ContextKey = "channel_status_request_id"
 
 	ContextKeyAutoGroup           ContextKey = "auto_group"

@@ -28,6 +28,16 @@ func SetVideoStudioRouter(router *gin.Engine) {
 	studio.GET("/context", middleware.DisableCache(), controller.GetVideoStudioContext)
 	studio.GET("/catalog", middleware.DisableCache(), controller.GetVideoStudioCatalog)
 	studio.GET("/v1/models", middleware.DisableCache(), controller.VideoStudioGroupAuthorization(), controller.GetVideoStudioModels)
+	studio.GET("/jobs", middleware.DisableCache(), controller.ListVideoStudioJobs)
+	studio.GET("/jobs/:id", middleware.DisableCache(), controller.GetVideoStudioJob)
+	studio.GET("/jobs/:id/result", middleware.DisableCache(), controller.GetVideoStudioJobResult)
+	studio.GET("/jobs/:id/assets/:asset", middleware.DisableCache(), controller.GetVideoStudioJobResult)
+
+	jobs := studio.Group("/jobs")
+	jobs.Use(middleware.RouteTag("relay"), middleware.SystemPerformanceCheck(), controller.VideoStudioGroupAuthorization(), middleware.ModelRequestRateLimit())
+	jobs.POST("/images/generations", controller.CreateVideoStudioJob("image", "images/generations"))
+	jobs.POST("/images/edits", controller.CreateVideoStudioJob("image", "images/edits"))
+	jobs.POST("/videos", controller.CreateVideoStudioJob("video", "videos"))
 
 	// Keep account metadata and completed-task retrieval available while relay
 	// admission is suspended; only submissions enter the billable relay policy.
@@ -39,16 +49,16 @@ func SetVideoStudioRouter(router *gin.Engine) {
 	billable.POST("/responses", controller.VideoStudioNormalizeRelayPath(), middleware.Distribute(), func(c *gin.Context) {
 		controller.VideoStudioRelay(c, types.RelayFormatOpenAIResponses)
 	})
-	billable.POST("/images/generations", controller.VideoStudioNormalizeRelayPath(), middleware.Distribute(), func(c *gin.Context) {
+	billable.POST("/images/generations", controller.VideoStudioNormalizeRelayPath(), controller.VideoStudioParameterAuthorization("image"), middleware.Distribute(), func(c *gin.Context) {
 		controller.VideoStudioRelay(c, types.RelayFormatOpenAIImage)
 	})
-	billable.POST("/images/edits", controller.VideoStudioNormalizeRelayPath(), middleware.Distribute(), func(c *gin.Context) {
+	billable.POST("/images/edits", controller.VideoStudioNormalizeRelayPath(), controller.VideoStudioParameterAuthorization("image"), middleware.Distribute(), func(c *gin.Context) {
 		controller.VideoStudioRelay(c, types.RelayFormatOpenAIImage)
 	})
 	billable.POST("/audio/speech", controller.VideoStudioNormalizeRelayPath(), middleware.Distribute(), func(c *gin.Context) {
 		controller.VideoStudioRelay(c, types.RelayFormatOpenAIAudio)
 	})
-	billable.POST("/videos", controller.VideoStudioNormalizeRelayPath(), middleware.Distribute(), controller.VideoStudioVideoModelAuthorization(), controller.VideoStudioRelayTask)
+	billable.POST("/videos", controller.VideoStudioNormalizeRelayPath(), controller.VideoStudioParameterAuthorization("video"), middleware.Distribute(), controller.VideoStudioVideoModelAuthorization(), controller.VideoStudioRelayTask)
 
 	read := studio.Group("/v1")
 	read.Use(middleware.RouteTag("relay"))

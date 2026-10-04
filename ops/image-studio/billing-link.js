@@ -13,6 +13,9 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
         : current.origin
   const consoleHref = `${newApiOrigin}/dashboard`
   let consoleRow
+  let billingData
+  let billingFailed = false
+  let billingRefreshing = false
 
   function isVisible(element) {
     const rect = element.getBoundingClientRect()
@@ -36,19 +39,45 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
     return `$${amount.toFixed(2)}`
   }
 
-  async function refreshBilling() {
+  function renderBilling() {
     const balance = document.getElementById('new-api-billing-summary')
-    if (!balance) return
+    const account = document.getElementById('new-api-account-balance')
+    let summary = '余额：读取中 · 赠送余额：读取中'
+    let amount = '...'
+    if (billingFailed) {
+      summary = '余额：暂不可用 · 赠送余额：暂不可用'
+      amount = '--'
+    } else if (billingData) {
+      const gift = Number.isSafeInteger(billingData.studio_gift_quota) && billingData.studio_gift_quota >= 0
+        ? formatQuota(billingData.studio_gift_quota, billingData)
+        : '暂不可用'
+      amount = formatQuota(billingData.remaining_quota, billingData)
+      summary = `余额：${amount} · 赠送余额：${gift} · 已用：${formatQuota(billingData.used_quota, billingData)}`
+    }
+    if (balance && balance.textContent !== summary) balance.textContent = summary
+    if (account && account.textContent !== amount) {
+      account.textContent = amount
+      account.setAttribute('aria-label', `账户余额：${amount}`)
+    }
+  }
+
+  async function refreshBilling() {
+    if (document.hidden || billingRefreshing) return
+    if (!document.getElementById('new-api-billing-summary') && !document.getElementById('new-api-account-balance')) return
+    billingRefreshing = true
     try {
       const response = await fetch(billingEndpoint, {
         credentials: 'same-origin',
         cache: 'no-store',
       })
       if (!response.ok) throw new Error('billing request failed')
-      const data = await response.json()
-      balance.textContent = `余额：${formatQuota(data.remaining_quota, data)} · 已用：${formatQuota(data.used_quota, data)}`
+      billingData = await response.json()
+      billingFailed = false
     } catch {
-      balance.textContent = '余额：暂不可用'
+      billingFailed = true
+    } finally {
+      billingRefreshing = false
+      renderBilling()
     }
   }
 
@@ -123,7 +152,7 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
       ) {
         return false
       }
-      return getVisibleButtons(group).length >= 2
+      return getVisibleButtons(group).length >= 1
     })
     if (nativeGroup) {
       return findActionInsertion(nativeGroup, getVisibleButtons(nativeGroup)[0])
@@ -131,13 +160,13 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
 
     const candidates = getVisibleButtons(topNav)
 
-    if (candidates.length < 2) return null
-    const first = candidates[candidates.length - 2]
+    if (!candidates.length) return null
+    const first = candidates[Math.max(0, candidates.length - 2)]
     const second = candidates[candidates.length - 1]
     let group = first.parentElement
     while (group && group !== topNav) {
       if (
-        group.contains(second) &&
+        (!second || group.contains(second)) &&
         hasClass(group, 'flex-none') &&
         hasClass(group, 'flex') &&
         hasClass(group, 'items-center') &&
@@ -186,7 +215,8 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
     badge.setAttribute('aria-live', 'polite')
     const summary = document.createElement('span')
     summary.id = 'new-api-billing-summary'
-    summary.textContent = '余额：读取中'
+    summary.textContent = '余额：读取中 · 赠送余额：读取中'
+    summary.title = '赠送余额仅限该工作站使用，调用时优先扣除'
     const online = document.createElement('span')
     online.id = 'new-api-online-count'
     online.textContent = '在线：读取中'
@@ -209,6 +239,23 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
       }
     }
 
+    let needsRefresh = false
+    const accountButton = [...document.querySelectorAll('#sidebar button')].find((button) =>
+      button.querySelector('img[src*="/users/"][src*="/profile/image"]') &&
+      button.querySelector('.font-normal.truncate')
+    )
+    if (accountButton) {
+      accountButton.classList.add('new-api-account-with-balance')
+      if (!accountButton.querySelector('#new-api-account-balance')) {
+        const account = document.createElement('span')
+        account.id = 'new-api-account-balance'
+        account.setAttribute('aria-live', 'polite')
+        account.title = '账户余额'
+        accountButton.append(account)
+        needsRefresh = !billingData
+      }
+    }
+
     const actionGroup = findTopActionGroup()
     let badge = document.getElementById('new-api-billing-badge')
     if (actionGroup) {
@@ -221,8 +268,13 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
         badge.remove()
         actionGroup.group.insertBefore(badge, actionGroup.first)
       }
-      if (wasMissing) void refresh()
+      if (wasMissing) {
+        needsRefresh = !billingData
+        void refreshOnlineCount()
+      }
     }
+    renderBilling()
+    if (needsRefresh) void refreshBilling()
   }
 
   mountControls()
@@ -232,5 +284,7 @@ import { C as ChevronLeft } from '/studio-v21/chunks/BECweHH6.js'
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) void refresh()
   })
-  window.setInterval(refresh, 30000)
+  window.addEventListener('focus', refresh)
+  window.setInterval(refreshBilling, 5000)
+  window.setInterval(refreshOnlineCount, 30000)
 })()

@@ -46,7 +46,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		return nil
 	}
 	delta := actualQuota - s.preConsumedQuota
-	if delta == 0 {
+	if delta == 0 && s.funding.Source() != BillingSourceTavern && s.funding.Source() != BillingSourceImageStudio {
 		s.settled = true
 		return nil
 	}
@@ -142,6 +142,12 @@ func (s *BillingSession) needsRefundLocked() bool {
 	if sub, ok := s.funding.(*SubscriptionFunding); ok && sub.preConsumed > 0 {
 		return true
 	}
+	if tavern, ok := s.funding.(*TavernFunding); ok {
+		return tavern.giftReserved > 0 || (tavern.fallback != nil && tavern.fallback.NeedsRefund())
+	}
+	if studio, ok := s.funding.(*ImageStudioFunding); ok {
+		return studio.giftReserved > 0 || (studio.fallback != nil && studio.fallback.NeedsRefund())
+	}
 	return false
 }
 
@@ -214,6 +220,10 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 			}
 			s.tokenConsumed = 0
 		}
+		var apiErr *types.NewAPIError
+		if errors.As(err, &apiErr) {
+			return apiErr
+		}
 		// TODO: model 层应定义哨兵错误（如 ErrNoActiveSubscription），用 errors.Is 替代字符串匹配
 		if errors.Is(err, ErrInsufficientWalletQuota) {
 			userQuota, quotaErr := model.GetUserQuota(s.relayInfo.UserId, false)
@@ -242,6 +252,10 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 
 func (s *BillingSession) reserveFunding(delta int) error {
 	switch funding := s.funding.(type) {
+	case *ImageStudioFunding:
+		return funding.Reserve(delta)
+	case *TavernFunding:
+		return funding.Reserve(delta)
 	case *WalletFunding:
 		// 与结算补扣（SettleBilling 正差额 → WalletFunding.Settle）语义一致：
 		// 全额无条件扣减，余额不足的部分记为欠费（余额可为负），不中断请求，
@@ -335,6 +349,14 @@ func (s *BillingSession) syncRelayInfo() {
 	info.FinalPreConsumedQuota = s.preConsumedQuota
 	info.BillingSource = s.funding.Source()
 
+	if tavern, ok := s.funding.(*TavernFunding); ok {
+		tavern.syncInfo()
+		return
+	}
+	if studio, ok := s.funding.(*ImageStudioFunding); ok {
+		studio.syncInfo()
+		return
+	}
 	if sub, ok := s.funding.(*SubscriptionFunding); ok {
 		info.SubscriptionId = sub.subscriptionId
 		info.SubscriptionPreConsumed = sub.preConsumed + int64(s.extraReserved)
@@ -355,6 +377,39 @@ func (s *BillingSession) syncRelayInfo() {
 
 // NewBillingSession 根据用户计费偏好创建 BillingSession，处理 subscription_first / wallet_first 的回退。
 func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError) {
+	if imageStudioCreditEligible(c, relayInfo) {
+		credit, err := model.GetImageStudioCredit(relayInfo.UserId)
+		if err != nil {
+			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
+		if credit.Quota > 0 {
+			session := &BillingSession{relayInfo: relayInfo}
+			session.funding = &ImageStudioFunding{context: c, info: relayInfo}
+			if apiErr := session.preConsume(c, preConsumedQuota); apiErr != nil {
+				return nil, apiErr
+			}
+			return session, nil
+		}
+	}
+	if relayInfo != nil && relayInfo.IsPlayground && c.GetBool("tavern_authenticated") &&
+		c.Request != nil && c.Request.Method == http.MethodPost && c.Request.URL.Path == "/pg/chat/completions" {
+		credit, err := model.GetTavernCredit(relayInfo.UserId)
+		if err != nil {
+			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
+		if credit.Quota > 0 {
+			session := &BillingSession{relayInfo: relayInfo}
+			session.funding = &TavernFunding{context: c, info: relayInfo}
+			if apiErr := session.preConsume(c, preConsumedQuota); apiErr != nil {
+				return nil, apiErr
+			}
+			return session, nil
+		}
+	}
+	return newRegularBillingSession(c, relayInfo, preConsumedQuota, false)
+}
+
+func newRegularBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int, allowEmptyWallet bool) (*BillingSession, *types.NewAPIError) {
 	if relayInfo == nil {
 		return nil, types.NewError(fmt.Errorf("relayInfo is nil"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
@@ -368,12 +423,22 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 		}
 		if userQuota <= 0 {
-			return nil, types.NewErrorWithStatusCode(
-				fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)),
-				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			allowDebt := allowEmptyWallet && preConsumedQuota == 0
+			if allowDebt && pref == "wallet_first" {
+				hasSub, checkErr := model.HasActiveUserSubscription(relayInfo.UserId)
+				if checkErr != nil {
+					return nil, types.NewError(checkErr, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+				}
+				allowDebt = !hasSub
+			}
+			if !allowDebt {
+				return nil, types.NewErrorWithStatusCode(
+					fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)),
+					types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
 		}
-		if userQuota-preConsumedQuota < 0 {
+		if preConsumedQuota > 0 && userQuota-preConsumedQuota < 0 {
 			return nil, types.NewErrorWithStatusCode(
 				fmt.Errorf("预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(userQuota), logger.FormatQuota(preConsumedQuota)),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,

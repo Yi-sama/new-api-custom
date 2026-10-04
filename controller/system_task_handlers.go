@@ -26,6 +26,7 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(ticketAutoCloseHandler{})
 	service.RegisterSystemTaskHandler(channelStatusMonitorHandler{})
 	service.RegisterSystemTaskHandler(channelRatioSyncHandler{})
+	service.RegisterSystemTaskHandler(videoStudioJobsHandler{})
 }
 
 type ticketAutoCloseHandler struct{}

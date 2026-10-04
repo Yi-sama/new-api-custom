@@ -539,6 +539,9 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	if resp == nil {
 		return nil, errors.New("resp is nil")
 	}
+	if common2.GetContextKeyString(c, mainconstant.ContextKeyStudioJobID) != "" && mainconstant.MaxFileDownloadMB > 0 {
+		resp.Body = http.MaxBytesReader(nil, resp.Body, int64(mainconstant.MaxFileDownloadMB)*1024*1024)
+	}
 	if common2.DebugEnabled {
 		policy := service.NormalizeHTTPTransportPolicy(info.ChannelSetting)
 		logger.LogDebug(c, fmt.Sprintf(

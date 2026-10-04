@@ -2,6 +2,510 @@
 
 ## Current Status
 
+- US production suite activated on 2026-10-04: updated profitability and full
+  Video Studio are deployed at `https://api.yisama.asia`; Tavern is deployed
+  with its native legal-configuration notice, NOT available for chat yet.
+  User deferred terms/privacy arrangements; never set the legal flag TRUE
+  without approved documents/notices. Workstation remains its original
+  production v29 frontend plus v28 backend image fix, with all seven layers.
+  Its WebUI and gateway IDs/start times were unchanged throughout this rollout.
+- Main version `v1.0.0-rc.28-custom-production-suite-20261003-001`, binary
+  SHA-256 `2c205bf966a6d300b8b3a4086329baa4af1f2234973974641b76c7e334d4a7db`.
+  Preserve THREE main Compose layers: `/opt/us-whitelist/docker-compose.yml`,
+  `releases/studio-credit-20261003-2120/backend.override.json`,
+  `releases/production-suite-20261003-001/backend.override.json`.
+  Port remains loopback 32794. Do not restart from only the original base file.
+- Tavern uses project `us-whitelist-tavern-production`, container
+  `risuai-production-20261003`, loopback-only 32831. Preserve BOTH release
+  `tavern.compose.json` AND `https-fix/tavern-runtime.override.json`.
+  Runtime hash `6e1b6175ae1ff411eb5df11a894fd86eb986daeba843480f81ca52fb3a182065`.
+  HTTPS public origins supported, backend still HTTP loopback-only; bridge
+  cookies Secure/HttpOnly/SameSite=Strict. New independent runtime/key/storage
+  under `/opt/us-whitelist/runtime/tavern-production`; no test data copied.
+- Active `/etc/nginx/conf.d/api-yisama.conf` is a symlink to release
+  `api-yisama.proxy-assets.conf`, including `tavern-proxy-assets.nginx.conf`.
+  Assets are proxied through Tavern because `/opt/us-whitelist` is root-only.
+  Keep that permission; do not expose the parent to make a static alias work.
+  Hashed Tavern scripts/CSS use gzip and immutable caching; API/HTML do not.
+- Verified root-only backup/rollback:
+  `/opt/us-whitelist/backups/production-suite-20261003-001/rollback.sh`.
+  Restores applications/ingress only, retaining live DB, gift ledgers, media,
+  and Tavern saves. Custom PostgreSQL dump and all three data mount archives
+  were validated before migration. No old release was overwritten.
+- Do NOT promote the test binary directly: frozen test source lacks production
+  Image Studio gift model/funding and replaces shared billing-session handling
+  with Tavern funding. Integrate both against the verified production baseline
+  `.local-builds/studio-credit-20261003/release-source`. Current worktree has both
+  paths, but is dirty. New frozen candidate has both funding paths tested;
+  original Image Studio funding/model/tests match production exactly.
+- Production/old-new-api remain slaves. Active `SYSTEM_TASK_TYPES` allows
+  scoped slave execution, restricting scheduler/claim/stale cleanup to
+  `video_studio_jobs,async_task_poll`; keep `UPDATE_TASK=true`. No master switch.
+  Additive real PostgreSQL migration created `studio_jobs`, `tavern_credits`
+  owned by application role `newapi` and added `models.parameters`; no full
+  AutoMigrate. Final counts: original Studio credit rows 1, Tavern credits 0,
+  video jobs 0. Only main New API was recreated and new Tavern started;
+  Nginx reloaded, all other containers unchanged.
+- RisuAI portal/public hostnames must match for main refresh-cookie sharing.
+  Production must not point back at test IP ports or reuse test database/storage.
+  Production HTTPS uses the existing TLS server with scoped Tavern routes.
+  No remote build/install/pull or paid call occurred. Final health/restart-0,
+  version/hash, 9 public asset hashes/cache/compression, anonymous 401 and
+  hostile-origin 403 checks pass. Chrome 1440x900/390x844 uses real public
+  assets with synthetic API/account responses; NOT real-account acceptance.
+  Human login, gift spending and paid-generation settlement remain pending.
+  Evidence: progress/debug "Production Suite Activation" and
+  `output/playwright/production-suite-deferred-live/`.
+
+- Historical local preparation before activation (2026-10-04):
+  `.local-builds/production-suite-20261003-001`, backend SHA-256
+  `4814e686d89eb047501b47fe29ae8d5b524a9e81b0bed3e4a091a75aafb5ae21`.
+  Dashboard types/lint/65 tests/build, scoped Go checks, Linux root/relaykit
+  builds and 2 additive migration tests pass. RisuAI 252 pass/3 skipped,
+  19 bridge checks and types 0/0 pass. Compose scope and Nginx/rollback
+  syntax passed. At that stage production still ran the original binary.
+  Deferred input: operator-approved terms/privacy documents. Public use is confirmed;
+  actual production `/api/user-agreement` and `/api/privacy-policy` return
+  empty strings and both enabled flags are false. Do not reuse test
+  `VITE_RISU_LEGAL_CONFIGURED=TRUE`. The notice-preserving build, public browser
+  checks, backup/upload/migration/activation are now complete; real settlement
+  remains pending. Runtime HTTPS regression adds a 20th passing bridge test.
+  See `docs/progress/2026-10-04.md`, `docs/debug/2026-10-04-debug.md` and
+  candidate `release/PREACTIVATION.md`. Overall: partially_verified.
+- Scope-confirmation follow-up: frozen source inventory rechecked at 2225/0,
+  Image Studio model/funding/tests match production exactly, 91 focused
+  top-level Go tests pass (156 including subtests), and Tavern runtime bundle
+  syntax passed. Subsequent browser checks found mobile brand-link overflow;
+  two layout classes fixed it, types/lint/build and red-to-green browser layout
+  recheck pass. Latest candidate/backend hashes are those listed above.
+
+- US Studio account balance/gift display (2026-10-03, v29): current frontend
+  `/opt/image-studio/releases/20261003-2325-account-balance-v29/`.
+  Its `frontend.override.json` must be appended after ALL six preexisting
+  Compose layers, including the v28 `backend.override.json` image fix.
+  Current container retains v28 bridge/images.py bind mounts, pinned image
+  and data volume. Main New API container/binary is unchanged.
+- Top badge explicitly says "赠送余额" alongside the separate wallet amount.
+  Bottom-left named account button shows only its wallet amount on the right.
+  Both share one uncached billing response, refresh every five seconds while
+  visible and immediately on focus/visibility, and reuse latest data after
+  native sidebar/header remount. Missing/error states do not invent credit.
+  The user canceled the welcome toast: active code no longer reads or writes
+  its acknowledgement marker. Existing markers are retained as inert data.
+- Custom scripts/CSS now live under `/studio-v29/custom/` with native modules
+  under `/studio-v29/`, bypassing the separately served backend `/static` tree.
+  HTTP body hashes are verified against mounted files, not just mount labels
+  or symbol presence. Nginx `studio-yisama.conf` adds no-store for HTML through
+  `$sent_http_content_type`; cached static native assets are unaffected.
+  Fresh real-account acceptance URL: `https://studio.yisama.asia/?ui=29`.
+- Prior missing gift diagnosis: screenshot confirms the correct public domain.
+  Origin access logs show v25 assets at 21:30 and v26 at 21:47 on October 3;
+  no successful public v27 helper load was observed in the inspected tail.
+  The old browser's exact loaded body is unavailable, so cache location is
+  not claimed proven. Versioned custom paths/HTML freshness address delivery
+  independently of the ambiguous browser/CDN cache layer.
+- v29 verification: 51 frontend/native-runtime tests + 8 image-size tests pass.
+  Synthetic loopback Chrome verified desktop/mobile account placement, header,
+  zero gift and wallet/gift updates within five seconds; NOT a production
+  account screenshot. Main/WebUI healthy, restart 0, six uploaded source hashes
+  match, four actual HTTP asset bodies match deployment, anonymous public
+  entry/helper/billing remain 401. Human acceptance remains pending.
+  Backup/rollback:
+  `/opt/image-studio/backups/20261003-2325-account-balance-v29/rollback.sh`.
+  Restores frontend/cache config only, preserving v28 fixes, ledger/settings.
+
+- Studio v27 human acceptance FAILED (2026-10-03): the user reports neither
+  requested gift display nor first-entry notice is visible after the release.
+  Do not describe this issue as fixed. The production mount and gateway still
+  pointed to v27/current backend at `studio.yisama.asia`. The later screenshot
+  confirmed the browser URL; its loaded body/authenticated response were unknown.
+  This session has no discoverable `node_repl` tool for the installed Computer
+  Use plugin. Superseded by v29 above; isolated fixture success is not
+  real-account UI acceptance.
+
+- US Studio gift display/notice (2026-10-03): historical frontend v27 was at
+  `/opt/image-studio/releases/20261003-2220-gift-notice-v27/`.
+  Append its `frontend.override.json` AFTER both v24 Compose files, the v25
+  override and the v26 override. Only Open WebUI was recreated; its image,
+  data volume, New API container/binary, gateway and credit ledger are unchanged.
+  Backup and frontend-only rollback:
+  `/opt/image-studio/backups/20261003-2220-gift-notice-v27/rollback.sh`.
+- The balance badge explicitly includes workstation gift credit, including
+  zero and unavailable states. Native success toast follows account readiness:
+  "Thanks for using this workstation" with the USD 1 grant and restricted,
+  gift-first spending explanation. `ui.newApiStudioGiftNotified` is persisted
+  through the existing per-account WebUI settings API and shared preference
+  write queue. Already-granted accounts without a notice receive one; no new
+  grant is issued. Model/image/size preferences remain intact.
+- v27 verification: 52 frontend/compiled-runtime tests and 8 image-size tests
+  pass. Existing isolated browser fixture checks at 1440x900 and 390x844 show
+  the gift field without overflow/overlap; native toast state and persisted
+  settings confirm one notice, zero notices after reload. Live v27 assets,
+  healthy/restart-0 containers, unchanged backend ID/hash and anonymous 401
+  boundaries pass. Real-account visual acceptance is still pending.
+  Original missing-field cause in the user's old tab is not established:
+  the v26 server already contained the gift code and ledger record; a stale
+  tab/cache is an inference, not a verified root cause.
+
+- US Open WebUI Studio credit (2026-10-03): the user accepted the previous
+  balance/model-preference fix. Production now runs
+  `v1.0.0-rc.28-custom-studio-credit-20261003.1`, SHA-256
+  `bafd36f8629e154b271f4b93e65a4b049657532364482a28c534e5fd28142d85`.
+  Backend release `/opt/us-whitelist/releases/studio-credit-20261003-2120`
+  needs the original Compose plus `backend.override.json`. Initial gift frontend was v26,
+  `/opt/image-studio/releases/20261003-2120-credit-v26/frontend.override.json`,
+  appended after both v24 Compose files and the v25 override; v27 above now supersedes it. Keep the explicit
+  project `image-studio` and env `/opt/image-studio/.env`.
+- Each account claims USD 1 once via verified Studio identity/context/billing.
+  `image_studio_credits` is separate from wallet and `tavern_credits`; only
+  signed workstation chat/Responses/image/audio requests spend it, before
+  the existing paid wallet/subscription preference. Gift remains at zero after
+  exhaustion and reentry never reissues it. No artificial production grant or
+  paid upstream test was performed. A real grant row was observed on reinspection;
+  detailed real-account display/settlement acceptance remains pending.
+- The exact previous production binary was reproducibly rebuilt before
+  patching: its SHA-256 is `3b37cfbd261c7c8fa157f4d35f6d50cd2d7bfd0f5f2f0f41b305cce129c5453f`.
+  Frozen source and recovery helpers are under
+  `D:\Open source project\.local-builds\studio-credit-20261003`.
+  Only this gift patch was deployed, not concurrent unfinished work.
+  Main site's 232 embedded frontend files remain byte-identical.
+- Studio gift table is owned by actual application role `newapi`, with
+  SELECT/INSERT/UPDATE verified. Slave mode is unchanged; migration was scoped
+  manually. PostgreSQL and WebUI backups/rollback are in
+  `/opt/us-whitelist/backups/studio-credit-20261003-2120`.
+  Revert applications with its `rollback.sh`, retaining gift records and history.
+  WebUI cold startup briefly became unhealthy then healthy; use observed
+  bounded readiness checks and persistent activation logs. Do not treat a
+  transport timeout as proof that deployment did or did not execute.
+
+- US Tavern group/loading follow-up (2026-10-03): active frontend is
+  `releases/risuai-entry-20261003-2300` under
+  `/opt/us-whitelist/test-new-api-20261002-174631`.
+  Onboarding, model settings and account settings show actual group keys,
+  never `desc` as the group name. Only these three Svelte files changed
+  from the frozen 2210 source; backend/runtime, storage, gift ledger,
+  billing and main group configuration/descriptions remain unchanged.
+  The prior aligned account/balance/gift layout is retained.
+- Tavern restarts now need NINE Compose files from the active RisuAI
+  container label: retain all eight prior layers and append this release's
+  `compose.entry.json`. The main container's unchanged label still lists
+  seven, so do not obtain the complete frontend config from it.
+  Backup: `backups/risuai-entry-20261003-2300`. Frontend-only rollback:
+  `bash /opt/us-whitelist/test-new-api-20261002-174631/releases/risuai-entry-20261003-2300/rollback.sh`.
+- Tavern static delivery is separately released at
+  `releases/risuai-entry-20261003-2330/nginx-http.conf`; configuration
+  `/etc/nginx/conf.d/tavern-http-20261003-1708.conf` is its symlink.
+  Only `/assets/` enables gzip/buffering/one-year immutable caching.
+  HTML/API/streaming retain their existing configuration; account is no-store.
+  Static backup: `backups/risuai-entry-20261003-2330-assets`. Rollback:
+  `bash /opt/us-whitelist/test-new-api-20261002-174631/releases/risuai-entry-20261003-2330/rollback-assets.sh`.
+  Preserve prior immutable releases and current storage/credit records.
+- Root cause evidence: multi-megabyte startup assets were uncompressed,
+  with `Cache-Control: public, max-age=0`; the same script was fast server-local
+  but slow over the public connection. Public browser startup transferred
+  8,206,773 bytes before versus 1,718,515 after (79.1% less).
+  After optimization, cold readiness was 22,943 ms and same-context reentry
+  429 ms with all startup transferSize values 0. Actual public assets and
+  normal HTTP cache were used, but account/storage fetches were synthetic
+  and external HTTPS fonts/styles were CDP-blocked. Not real-user timing;
+  old readiness timed out at 90 seconds, not an exact 90-second baseline.
+- Nginx reload is asynchronous: initial immediate static-header check hit
+  old workers and automatically rolled back only static configuration.
+  The separate 2330 activation checked new cache headers for at most
+  20 one-second intervals, then gzip/content equality; attempt 2 passed.
+  Do not treat a successful reload signal as observed serving readiness.
+- Current/frozen Svelte checks (0 errors/warnings), unminified Vite build,
+  four isolated group/continue/layout scenarios and 264 deployed file
+  checksums passed. Main container/binary unchanged, both applications
+  healthy/restart 0 in final saved inspection. Entry remains plain HTTP
+  `http://156.238.252.115:32795/tavern`. Evidence:
+  `output/playwright/risuai-entry-20261003-2300/`.
+  Owned test browsers were confirmed closed without touching the other
+  `statekit-improvement` session. No real generation/paid call.
+  overall: partially_verified; real-account visual/loading acceptance and
+  paid settlement remain pending.
+
+- US Tavern welcome/gift backend release (2026-10-03): retained immutable release is
+  `releases/tavern-credit-20261003-2110` under
+  `/opt/us-whitelist/test-new-api-20261002-174631`. Main entry is HTTP
+  `156.238.252.115:32795/tavern`; native Tavern is HTTP
+  `156.238.252.115:32796/?connect=1`. Native welcome uses site name/Airisu,
+  connection uses the Tavern nickname, and account keeps main display name.
+  Each account receives USD 1 once via independent `tavern_credits`.
+  Only server-proved Tavern chat consumes it, before normal main billing;
+  ordinary API/playground/images cannot use it. The browser has no service
+  proof key and cannot grant credit by setting request flags.
+- At gift activation, Tavern Compose needed SEVEN files, superseding the six-layer
+  entry repair below: append `compose.credit.json` from the current release.
+  Both application labels then listed all seven; the layout frontend above
+  now adds the eighth layer for RisuAI. Binary/runtime/original assets reuse
+  validated `...-2050` artifacts from the frozen `...-2028` source, not later
+  concurrent worktree edits. Existing unrelated work remains uncommitted.
+  Backups: `backups/tavern-credit-20261003-2110`. Rollback:
+  `bash /opt/us-whitelist/test-new-api-20261002-174631/releases/tavern-credit-20261003-2110/rollback.sh`.
+  Preserve gift records/database/storage when reverting applications.
+- PostgreSQL deployment must give a new table to the application role,
+  not the shared database administrator. Initial `...-2050` activation
+  rolled back because GORM could not see administrator-owned tavern_credits.
+  Corrected schema transaction assigns only that table and verifies access.
+  Actual test NODE_TYPE is master. The retained proof key is backed up and
+  reused; do not overwrite it or expose its value.
+- Tavern validation is partially_verified: focused Go/Node/Vitest,
+  Svelte/build, deployed hashes/health/boundaries and three fixture-assisted
+  Chinese/English desktop/mobile UI checks passed. UI static assets used
+  local files verified identical to deployment; identities/storage were
+  intercepted and no real generation occurred. Public asset loading was
+  slow and timed out, so real first-load performance, real-account visual
+  acceptance, real paid settlement and MySQL runtime remain pending.
+  Evidence: `output/playwright/tavern-credit-20261003-2110/verification.json`
+  and today's `US Tavern Restricted Welcome Credit` progress/debug.
+
+- US Open WebUI workstation preferences repair (2026-10-03): production
+  uses frontend v25 on the unchanged backend image
+  `sha256:9e155cff81dc2ec37031f6ff39af53b6b84a0133b52f058fae609e6d0e2f02e1`.
+  A single native header action now receives the balance badge. Explicit
+  chat model selections automatically save `ui.models` through the existing
+  per-user settings API and share the ordered image-preference save queue.
+  Production read-only inspection confirmed the owner's image model was
+  already persisted as `gpt-image-2.5-web`; chat defaults were absent.
+  No production account settings were directly changed.
+- Active workstation deployment: retain the original two Compose layers in
+  `/opt/image-studio/releases/20260928-173340-image-studio-redirect-v24/`,
+  plus
+  `/opt/image-studio/releases/20261003-200103-preferences-v25/frontend.override.yml`.
+  Always use `--project-name image-studio --env-file /opt/image-studio/.env`.
+  The override pins the existing image and mounts its prepared frontend
+  `build/` read-only at `/app/build`. Preserve the existing
+  `image-studio_open_webui_data` volume. Only Open WebUI was recreated; no
+  build, pull, New API/Caddy restart, upstream inference or generation.
+- Workstation verification: frontend 47/47 and image size 8/8; actual native
+  controls in an isolated browser retained chat model, image model and size
+  after reload. Single-action balance and nonoverlapping layout passed at
+  1440x900 and 390x844. Production health/static endpoints returned 200;
+  anonymous gateway access stayed 401. Real signed-in acceptance is pending:
+  hard-refresh, select the desired chat model once, then revisit a new chat.
+  Backup is the old release's `backup-20261003-200103/`. Rollback uses the
+  original two Compose files with `up -d --no-build --no-deps open-webui`,
+  omitting the frontend override. See today's progress/debug entries.
+
+- US Tavern login return repair (2026-10-03): the Tavern sign-in link now
+  targets main `/sign-in?redirect=%2Ftavern`; previously an already signed-in
+  main session returned to `/dashboard/overview` instead of Tavern. Main
+  `/tavern` itself was already correct. Only the native RisuAI frontend was
+  changed, using a new immutable `releases/risuai-entry-20261003-1850` directory
+  and `compose.entry.json`, with backup in `backups/risuai-entry-20261003-1850`.
+  Active Compose now requires SIX files: the five below plus this latest
+  entry override. Every other running container retained its ID/start time;
+  New API's binary SHA-256 and data configuration are unchanged.
+  RisuAI was recreated once for this repair. Rollback:
+  `bash /opt/us-whitelist/test-new-api-20261002-174631/releases/risuai-entry-20261003-1850/rollback.sh`.
+  Unit regressions reproduced the missing return parameter before repair;
+  11 bridge tests passed afterwards and Svelte check reported 0 errors/warnings.
+  Final browser-only checks at 1440x900 and 390x844 covered native sign-in
+  links, main entry/login return and native account/chat-model onboarding.
+  Both sizes had no page errors or horizontal overflow; generation count 0.
+  Screenshots and captured results are under
+  `output/playwright/risuai-entry-20261003-1850`. The test browser is closed.
+  Real account login and paid settlement are still pending. No credentials
+  were exported and no real provider generation was performed.
+
+- US RisuAI HTTP Tavern (2026-10-03): user explicitly authorized deployment
+  to the existing isolated test site using public IP/plain HTTP, not HTTPS
+  or a domain and not overwriting prior releases. Main test port remains
+  `32795`; native Tavern is `http://156.238.252.115:32796/?connect=1`.
+  Main release is `releases/tavern-http-20261003-1708`, RisuAI frontend
+  correction is `releases/risuai-portal-20261003-1820`; both are under
+  `/opt/us-whitelist/test-new-api-20261002-174631`.
+  Initial Compose needed all FIVE files: base, Video Studio, corrected Canvas
+  CSS, `compose.tavern.json`, and `compose.portal.json`. Main container was
+  recreated once; RisuAI was started then recreated for frontend-only repair.
+  Node binds `127.0.0.1:32830`, with new Nginx/UFW TCP `32796` configuration.
+  Formal services, test Redis, fixed Canvas assets and four reconnected
+  Sub2API channels are preserved. No real generation or credential export.
+  Frontend environment MUST include both `VITE_NEW_API_BRIDGE=1` and
+  `VITE_NEW_API_PORTAL_URL=http://156.238.252.115:32795`; otherwise a signed-out
+  user gets a broken Tavern-local login link. Initial runtime detection led
+  to a new immutable frontend version, not an in-place asset replacement.
+  Local 36 focused tests, types, builds, bundled HTTP boundaries and
+  synthetic public-origin 1440x900/390x844 onboarding/model/settings checks
+  passed. User count/quota/request counters matched the preactivation dump;
+  browser generation count 0. Real account login and paid settlement remain
+  pending (`partially_verified`). HTTP is deliberately unencrypted: use
+  test credentials. Full backups and rollback commands are in today's
+  progress under `US RisuAI HTTP Tavern`.
+
+- US test Sub2API reconnection (2026-10-03) supersedes the synthetic-only
+  channel status below. Only test database `newapi_test_20261002174631`
+  channels 4/32/34/35 now use their existing, verified Sub2API credentials
+  and `http://sub2api:8080`; all four are enabled with 31 enabled ability
+  rows. Channel 4 previously had status 1 but disabled ability rows.
+  The other 19 channels, pricing, models, groups, Compose, binaries and
+  production New API configuration were not changed; no service restarted.
+  Root-only backup and scoped rollback:
+  `/opt/us-whitelist/test-new-api-20261002-174631/backups/sub2api-channels-20261003-171637`.
+  All four upstream model-list GETs and test New API group-key GETs returned
+  200. Existing test API keys were used only inside the server, not exported.
+  Test quota/consume-log counters remained unchanged; studio/native tasks 0.
+  Actual generation and billing remain pending user acceptance and consume
+  real upstream credit. Channel 33 and all video providers remain isolated.
+  `gpt-6`, `gpt-6-luna` and `gpt-reserve` lack billing configuration in both
+  the test and production databases, so New API correctly filters them.
+  The mixed-pool upstream also does not advertise `gpt-6`.
+  These pricing/model issues were not bypassed or silently assigned prices.
+  The other Sub2API test instance has no API keys and is not this connection.
+
+- Canvas test-deployment CSS correction (2026-10-03): user found the
+  authenticated workbench unstyled after the first deployment. Staging
+  omitted the existing `web/postcss.config.mjs`, so Tailwind layout and
+  breakpoint classes were never generated. Restoring this config in the
+  isolated copy and rebuilding Canvas fixed the root cause without changing
+  business code, backend binary, billing or production. Active static
+  release is now
+  `/opt/us-whitelist/test-new-api-20261002-174631/releases/canvas-css-20261003-1530`;
+  active Compose requires base `compose.yml`, the earlier
+  `video-studio-20261003-1433/compose.override.json`, AND
+  `canvas-css-20261003-1530/compose.canvas-css.json`.
+  Only the static mount differs. Old files are retained, config snapshots
+  are under `backups/canvas-css-20261003-1530`.
+  Compiled-CSS regression, public served hash, healthy test startup and
+  synthetic authenticated 1280x720/390x844 browser layout passed.
+  The user confirmed the layout recovered; real generation remains pending.
+  Never select a frontend build's root files solely by extensions without
+  checking its PostCSS/build configuration; validate compiled utilities.
+  Today's progress contains active/rollback commands and screenshot locations.
+
+- US Video Studio test deployment (2026-10-03) supersedes the older test
+  binary/slave status below. Only `new-api-test-20261002-174631` was updated
+  to `v1.0.0-rc.28-custom-video-studio-20261003.1` using a new immutable
+  release and Compose override, not overwriting `compose.yml` or the old
+  program. Release root:
+  `/opt/us-whitelist/test-new-api-20261002-174631/releases/video-studio-20261003-1433`.
+  Original test DB/Redis/data/binary/config backup:
+  `backups/video-studio-20261003-1433`, plus a second pre-ownership-change DB
+  dump under `backups/video-studio-20261003-1433-ownership`.
+  The cloned tables/sequences were owned by `sub2api`, which blocked master
+  migration; only their ownership inside the isolated test database was
+  assigned to its existing dedicated test role. No production role/database
+  or source code changed. Master/UPDATE_TASK now work with synthetic-only
+  channels and automatic upstream tests/model/status checks disabled.
+  `studio_jobs` and model `parameters` migration, healthy startup, assets,
+  unauthenticated 401 boundary and browser login gate passed. No remote
+  generation or paid call; authenticated workflows remain pending.
+  Public test binding was already `0.0.0.0:32795` before this work; older
+  loopback-only notes below are historical. Prefer SSH-tunnel login, since
+  the public endpoint is HTTP. Automatic local tunnel startup was blocked
+  by tool policy and no tunnel exists.
+  Production and test Redis container identities/start times remained
+  unchanged. Details, rollback and active Compose command:
+  `docs/progress/2026-10-03.md`. Do not run only the base Compose file when
+  intending to keep this version: base-only returns to the preserved old
+  binary and slave mode.
+
+- RisuAI managed-settings adaptation: keep the upstream native UI and the
+  existing New API at localhost:3000 / `.local-tests/abc-shared.db`, with RisuAI
+  at localhost:3200. Site labels come from `system_name`, not a hardcoded
+  gateway name. Chat groups/models are capability-filtered server-side.
+  `gpt-image-*` recognition covers the locally configured image variants.
+  Until Auto candidates and non-chat services have verified hosted contracts,
+  RisuAI omits Auto and disables image generation and remote TTS; do not claim
+  those features are already New API billed. Provider URL/key/tokenizer/network
+  controls are hidden in bridge mode, including auxiliary and fallback model
+  entry points. Imported credentials are not deleted. Native local/creative
+  user settings remain. Scoped automated checks and synthetic desktop/mobile
+  verification passed; the user's real-account and paid settlement acceptance
+  remain pending. Details: `docs/progress/2026-10-02.md`, RisuAI Managed Settings.
+
+- US isolated New API test instance (2026-10-02): built from the current
+  local dirty worktree, not the older GitHub snapshot. Local frontend
+  profitability tests passed 29/29, frontend typecheck/lint/format passed,
+  backend `Profitability|Sub2API` tests passed, and the Linux amd64 CGO-free
+  binary was built with SHA-256
+  `d503e5953159a2eed4e4e4ac28234d6377c3d971010109265926d49435b5e750`.
+  The test service runs as `new-api-test-20261002-174631` on
+  `127.0.0.1:32795`, version
+  `v1.0.0-rc.28-custom-local-test-20261002`, with an independent Redis
+  container, a cloned PostgreSQL database, a distinct database user,
+  distinct session/crypto secrets, and `NODE_TYPE=slave`.
+  The cloned test database has 23 channels rewritten to loopback address
+  `127.0.0.1:9` with fake keys; one channel remains synthetically enabled
+  for selector testing. Production `new-api`, `old-new-api`, Sub2API,
+  production Redis and PostgreSQL container identities/start times remained
+  unchanged. Test endpoint health and unauthenticated profitability boundary
+  checks passed. Test-only options disable Turnstile and registration and set
+  the server address to `http://127.0.0.1:32795`, so SSH-tunnel login does
+  not depend on production origin validation. Human browser/login acceptance
+  is pending.
+
+- Video Studio background integration (2026-10-02): the managed image/video
+  workbench now uses durable New API-owned jobs and private result storage.
+  Accepted submissions survive browser close, polling resumes by the same job
+  identity, and a lost submission response is resolved by its idempotency
+  request ID without a second paid POST. Ambiguous upstream submission is
+  marked uncertain and is never blindly resubmitted. A local synthetic
+  end-to-end check submitted one image, closed the page while the mock held
+  the response, released it, reopened the workbench, recovered the result,
+  and observed exactly one synthetic charge.
+- Model-specific creation parameters are configured in the existing admin
+  Models -> Metadata -> Edit drawer under "Studio parameter profiles".
+  Supported allowlists cover image/video sizes, ratios, quality/count,
+  duration/resolution/mode, audio/watermark, and FPS; group JSON overrides
+  replace only the configured fields for that group. The local fixture was
+  checked by overriding the default group's video duration to 8 seconds and
+  observing only 8 seconds in the managed video selector.
+- Session renewal is limited to the trusted managed bridge. GET/polling may
+  renew once; a billable POST is never replayed after a 401 or uncertain
+  response. Canvas state stays mounted during renewal, so renewal does not
+  replay paid work or lose the current page state.
+- Current synthetic verification preview: `http://localhost:3121/video-studio`
+  with fixture account `videotest` and a local mock provider on port 3108.
+  The account and provider are synthetic only. Port 3000 is currently stopped;
+  the normal account-snapshot launcher remains available but must not be used
+  for paid acceptance because it runs as a slave with task updates disabled.
+- Real upstream video completion/download, production database migration,
+  MySQL/PostgreSQL runtime, and US-server deployment remain unverified. The
+  original `.local-tests/abc-shared.db` was not modified.
+
+- Video Studio background-job clarification (2026-10-01): "background" means
+  server-owned generation that continues after browser disconnect/close, NOT
+  a new administrator management page. User asks for the design of per-model
+  parameters and explanation of session expiry before further implementation.
+  Current studio image routes still use synchronous relay and browser-side
+  result persistence; video already uses New API task records/polling primitives.
+  Proposed direction: durable server task/result ownership, reuse existing
+  routing and billing, and resume by task identity without blind resubmission.
+  Capability constraints should come from verified server configuration, with
+  group differences respected; the current catalog exposes only broad types.
+  Browser token renewal is separate from execution of an accepted server job.
+  No implementation or production change has been made for this clarification.
+
+- Video Studio follow-up review (2026-10-01): user defers real image-model and
+  billing acceptance until server rollout. Before broad release, prioritize
+  distinguishing workbench polling/download interruption from terminal task
+  failure: the existing Retry starts a new potentially billable task.
+  Parameter-aware controls and expired-session recovery are recommendations,
+  not authorized new implementation. See today's review record; no production
+  operation or feature edit was made during this assessment.
+
+- Video Studio group/model filtering (2026-10-01): `/api/video-studio/catalog`
+  derives permitted groups and model capabilities from existing New API settings.
+  Video selectors show only usable video models/groups; image/text/audio use
+  independent capability filters. Submissions carry an encoded selected group,
+  validated before routing; video capability is checked before charging.
+  Existing tasks remain owner-readable after a group/model is removed.
+  Same-name models retain distinct group identity in persisted settings/nodes.
+  No separate administrator settings or wallet were added.
+  Focused Go tests, 11 Canvas checks, typecheck and builds passed; desktop
+  filtering/persistence/image separation/empty-state checks passed. Mobile
+  selector verification is pending because the browser viewport override had
+  no observable effect. Paid provider settlement remains untested.
+  Local 3000 PID 10728 and synthetic 3117 PID 38400 run the same tested binary.
+  Backup: `G:\new-api-video-runtime\before-catalog-20261001-153103`.
+  Live Canvas entry: `index-DPGUdI7K.js`; full details are in today's progress
+  and debug records. The 3000 account snapshot currently has no video models,
+  so its empty state is expected. Original database and US services were not
+  modified. User accepted the prior navigation placement; this new filtering
+  behavior still needs user acceptance.
+
 - US profitability deployment preflight (2026-10-01): production remains
   healthy on `v1.0.0-rc.28-custom-profitability-20260930.2`; no deployment or
   restart occurred. The exact old binary is retained, but its source baseline
@@ -10,12 +514,15 @@
   the current dirty checkout or the September 28 Git snapshot reproduces it.
   Resume after recovering a verifiable baseline or separately approving
   review/release of the broader local version.
-  Follow-up authenticated GitHub check confirmed both private backups exist:
-  `Yi-sama/new-api-custom/main` is `2ec1006`, last pushed September 28;
-  `Yi-sama/sub2api-custom` has `main=b990204` and
-  `statekit-v0.2.8-test=e956d90`. The New API snapshot omits the current
-  per-group backend/ledger files and the enabled-only purchase selector.
-  This is a release-scope gap, not an absence of Git backups.
+  Superseding authenticated GitHub check on October 1 confirmed New API
+  `main=a2cc5d6a9c5bd68e866fbfc5d37d0223c55ccb1e`, committed at
+  15:31:02 +08:00. All 14 checked profitability/integration/locale files
+  match the local source, including group ratios and enabled-only purchases.
+  The earlier September 28 backup gap is resolved. This snapshot also
+  contains Video Studio routes and the Tavern entry; its 73-file diff is
+  against the September 28 backup, not the exact running production source.
+  Await explicit approval for that broader New API release scope before
+  building/deploying the complete snapshot. No US changes were made.
 
 - Video Studio refresh follow-up (2026-10-01): the static route now sends
   `Cache-Control: no-cache`; the host uses `/video-canvas/video?v=2` once to
@@ -91,31 +598,67 @@
   `G:\infinite-canvas-original-preview\paused-account-integration`.
   No US server operations are authorized by this integration request.
 
-- 2026-09-30 local Tavern is implemented in `web/src/features/tavern`,
-  `web/src/stores/tavern-store.ts`, and the authenticated `/tavern` route.
-  It reuses Playground session-authenticated billing; no Tavern backend,
-  token store, or separate balance exists. Browser records use
-  `new-api:tavern:<userId>` and do not sync between devices/origins.
-  Character import is JSON only, with basic V1/V2/V3 field support;
-  unsupported extensions are retained, not executed.
-  The user's follow-up requires a standalone full-viewport page: no console
-  header/sidebar and no iframe, with a return link to the dashboard.
-  Balance/groups/models refresh on mount and refocus. Account responses
-  synchronize the current user's shared auth cache so dashboard balances
-  and counters do not remain stale after Tavern use; chat completion also
-  refreshes server balance. No frontend wallet ledger exists.
-- Tavern source preview runs at `http://localhost:3107/tavern`, proxying
-  `/api` and `/pg` to the already-running local port-3000 preview.
-  The port-3000 process observed during this task was
-  `G:\new-api-video-runtime\new-api-video.exe`; it was not restarted.
-  The standalone follow-up passed 38 affected tests, source/build checks,
-  and browser checks at 1440x900 and 390x844 using the synthetic fixture.
-  User acceptance and real provider billing remain pending; do not describe
-  the synthetic reply as proof of actual charging.
-  The later account-sync change passed 39 relevant tests and build checks.
-  Real port-3107 browser verification currently requires signing in with a
-  local account. Its balance/chat endpoints reject anonymous calls with 401.
-  Synthetic port-3110 screenshots ($1 test balance) are not real account data.
+- 2026-10-01 Tavern direction changed at the user's request to upstream
+  RisuAI. Source: `D:\Open source project\V Visa-free\risuai`, commit
+  `f9728b14c733d073168d8d0c6a8f34f8febf0304`. Preserve the native Svelte UI
+  and upstream attribution. Do not add a header, iframe, or custom chat UI.
+  Native settings hold New API account/balance and group/model selection.
+- `/tavern` now redirects to `http://localhost:3200/?connect=1`.
+  `start-local-tavern.ps1` launches the native Node server. Backend 3000 and
+  the same local New API at 3000 is the login portal; this integration does
+  not start another New API instance.
+  Configuration and verification commands are in `ops/risuai/README.md`.
+- RisuAI uses New API's existing session refresh and fixed
+  `/pg/chat/completions` billing path. Bearers remain in encrypted HttpOnly
+  cookies. There is no shared provider key or second wallet. Storage goes
+  to `.local-tests/risuai-runtime-3200/data/users/<New API user ID>`;
+  preserve that directory and `data/.session-secret`.
+- The integration is HTTP-loopback-only and needs no Mongo/Redis/Docker.
+  External plugins, image generation, and TTS are not claimed as integrated
+  billing features. No production/US operations or paid inference authorized.
+- The retired Tavern containers, Mongo/Redis volumes, and project network were
+  removed after a data export. The offline backup is
+  `.local-tests/retired-tavern-backup-20261001`: Mongo archive (one user, one
+  profile, one character, no chats/messages), original `.token_secret`, and
+  Redis data. Mongo dump and restore dry-run passed; archive SHA256:
+  `1A7B7A255A9B0CBA1A1550867C4799F8E8533D697D3B6BD5C55553806236ECA5`.
+- The active portal helper/configuration files for the retired Tavern were
+  removed or replaced. Historical audit records and any offline backup copies
+  are not runtime inputs; do not load them into the active deployment.
+- RisuAI dependencies use C: due D: having only about 630 MiB free:
+  `C:\tmp\risuai-node-modules` (virtual store) and
+  `C:\tmp\risuai-pnpm-store`. The lockfile was not changed.
+  Build/runtime status is recorded in `docs/progress/2026-10-02.md`.
+- October 2 verification: RisuAI build, Svelte check (0 errors/warnings),
+  13 HTTP bridge tests, 5 frontend bridge tests, and 3 New API entry tests
+  passed. New API typecheck and scoped Tavern lint passed. October 1 browser
+  verified native onboarding, character creation, chat, model settings,
+  and synthetic debit (901: 5,000,000 -> 4,987,500; 902 unchanged).
+  The observed browser request was non-streaming; SSE is tested at the
+  bridge HTTP boundary, not yet verified in the final browser build.
+- Earlier on October 2 the resumed environment had no listeners and background
+  launch was rejected by tool policy. The continuation later started only the
+  synthetic fixture on `127.0.0.1:3211` and RisuAI on `127.0.0.1:3210`.
+  The launcher rebuild with `VITE_RISU_LEGAL_CONFIGURED=TRUE` was required
+  after a standalone build overwrote the private self-hosting flag.
+- Final synthetic browser verification loaded the native RisuAI chat page,
+  restored Alice's chat, showed the selected `Fixture-chat` model badge, and
+  returned 200 from `/api/new-api/account`. Desktop and 390x844 screenshots
+  are in `output/playwright/`. The only console error is the expected
+  RisuRealm 404 because external Realm/plugin routes are unavailable in
+  bridge mode. No paid provider request or US-server operation was performed.
+- Current local account flow uses the existing New API process on
+  `http://localhost:3000` with `.local-tests/abc-shared.db`; RisuAI is a
+  separate native frontend on `http://localhost:3200/?connect=1`. Both
+  bridge and portal URLs use `localhost:3000` so the login cookie is shared
+  across ports. A 401 before the first login is expected.
+- The local3000 executable must be rebuilt after frontend changes because
+  `main.go` embeds `web/dist`. The September 27 binary lacked the Tavern tab;
+  the pre-rebuild binary is preserved at
+  `.local-tests/new-api-local-b-c.before-tavern-20261002.exe`.
+- The default RisuAI `pnpm test` now excludes the Node-native bridge test file
+  from Vitest and runs it afterward with Node: 28 Vitest files / 246 tests
+  passed with 3 skipped, followed by 13 Node-native tests passed.
 
 - 2026-09-30 expanded local retirement audit: exact full paths and restore
   evidence are in `docs/local-cleanup-paths-2026-09-30.md`. After formal

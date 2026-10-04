@@ -495,6 +495,9 @@ func applyAutoModelCandidate(c *gin.Context, info *relaycommon.RelayInfo, retryP
 }
 
 func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) bool {
+	if common.GetContextKeyString(c, constant.ContextKeyStudioJobID) != "" {
+		return false
+	}
 	if openaiErr == nil {
 		return false
 	}
@@ -670,6 +673,9 @@ func RelayTask(c *gin.Context) {
 		respondTaskError(c, taskErr)
 		return
 	}
+	if taskID := common.GetContextKeyString(c, constant.ContextKeyStudioNativeTaskID); taskID != "" {
+		relayInfo.PublicTaskID = taskID
+	}
 
 	var result *relay.TaskSubmitResult
 	var taskErr *taskdto.TaskError
@@ -787,6 +793,9 @@ func respondTaskError(c *gin.Context, taskErr *taskdto.TaskError) {
 }
 
 func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *taskdto.TaskError, retryTimes int) bool {
+	if common.GetContextKeyString(c, constant.ContextKeyStudioJobID) != "" {
+		return false
+	}
 	if taskErr == nil {
 		return false
 	}

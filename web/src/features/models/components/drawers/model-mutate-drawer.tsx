@@ -84,6 +84,10 @@ import { safeJsonParse } from '@/features/system-settings/utils/json-parser'
 import { createModel, updateModel, getModel, getVendors } from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES } from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
+import {
+  buildStudioParameters,
+  readStudioParameterFormValues,
+} from '../../lib/studio-parameters'
 import type { Model } from '../../types'
 
 // Extended schema for ratio configuration (internal form state only)
@@ -95,6 +99,19 @@ const extendedModelFormSchema = z.object({
   tags: z.array(z.string()),
   vendor_id: z.number().optional(),
   endpoints: z.string(),
+  image_sizes: z.string(),
+  image_aspect_ratios: z.string(),
+  image_qualities: z.string(),
+  image_counts: z.string(),
+  video_sizes: z.string(),
+  video_aspect_ratios: z.string(),
+  video_durations: z.string(),
+  video_resolutions: z.string(),
+  video_modes: z.string(),
+  video_generate_audio: z.string(),
+  video_watermarks: z.string(),
+  video_fps: z.string(),
+  group_parameter_overrides: z.string(),
   name_rule: z.number(),
   status: z.boolean(),
   sync_official: z.boolean(),
@@ -368,6 +385,19 @@ export function ModelMutateDrawer({
       tags: [],
       vendor_id: undefined,
       endpoints: '',
+      image_sizes: '',
+      image_aspect_ratios: '',
+      image_qualities: '',
+      image_counts: '',
+      video_sizes: '',
+      video_aspect_ratios: '',
+      video_durations: '',
+      video_resolutions: '',
+      video_modes: '',
+      video_generate_audio: '',
+      video_watermarks: '',
+      video_fps: '',
+      group_parameter_overrides: '',
       name_rule: 0,
       status: true,
       sync_official: true,
@@ -417,6 +447,8 @@ export function ModelMutateDrawer({
   useEffect(() => {
     if (open && isEditing && modelData?.data) {
       const model = modelData.data
+      // Hydrate the controlled editor from the asynchronously loaded server record.
+      // eslint-disable-next-line react/set-state-in-effect
       setOldModelName(model.model_name)
 
       const pricing = readPricingConfig(
@@ -436,6 +468,7 @@ export function ModelMutateDrawer({
         tags: parseModelTags(model.tags),
         vendor_id: model.vendor_id,
         endpoints: model.endpoints || '',
+        ...readStudioParameterFormValues(model.parameters),
         name_rule: model.name_rule || 0,
         status: model.status === 1,
         sync_official: model.sync_official === 1,
@@ -461,6 +494,7 @@ export function ModelMutateDrawer({
         tags: [],
         vendor_id: undefined,
         endpoints: '',
+        ...readStudioParameterFormValues(),
         name_rule: 0,
         status: true,
         sync_official: true,
@@ -490,13 +524,31 @@ export function ModelMutateDrawer({
           imageRatio,
           audioRatio,
           audioCompletionRatio,
+          image_sizes,
+          image_aspect_ratios,
+          image_qualities,
+          image_counts,
+          video_sizes,
+          video_aspect_ratios,
+          video_durations,
+          video_resolutions,
+          video_modes,
+          video_generate_audio,
+          video_watermarks,
+          video_fps,
+          group_parameter_overrides,
           ...modelData
         } = submitData
 
+        const modelPayload = {
+          ...modelData,
+          parameters: buildStudioParameters(values),
+        }
+
         const response =
           isEditing && currentModelId
-            ? await updateModel({ ...modelData, id: currentModelId })
-            : await createModel(modelData)
+            ? await updateModel({ ...modelPayload, id: currentModelId })
+            : await createModel(modelPayload)
 
         if (response.success) {
           // Handle ratio configuration updates in system settings
@@ -917,6 +969,222 @@ export function ModelMutateDrawer({
                     </FormControl>
                     <FormDescription>
                       {t('How this model name should match requests')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </SideDrawerSection>
+
+            <SideDrawerSection>
+              <h3 className='text-sm font-semibold'>
+                {t('Studio parameter profiles')}
+              </h3>
+              <div className='grid gap-4 sm:grid-cols-2'>
+                <FormField
+                  control={form.control}
+                  name='image_sizes'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Image sizes')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='1024x1024, 1536x1024' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='image_aspect_ratios'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Image aspect ratios')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='1:1, 16:9' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='image_qualities'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Image qualities')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='low, medium, high' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='image_counts'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Image counts')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='1, 2, 4' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='video_sizes'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Video sizes')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='1280x720, 720x1280' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='video_aspect_ratios'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Video aspect ratios')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='16:9, 9:16' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='video_durations'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Video durations (seconds)')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='4, 8' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='video_resolutions'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Video resolutions')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='720p, 1080p' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='video_modes'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Video modes')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='frames, reference' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='video_fps'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Video frame rates')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder='24, 30' />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {(['video_generate_audio', 'video_watermarks'] as const).map(
+                  (name) => (
+                    <FormField
+                      key={name}
+                      control={form.control}
+                      name={name}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t(
+                              name === 'video_generate_audio'
+                                ? 'Video audio options'
+                                : 'Video watermark options'
+                            )}
+                          </FormLabel>
+                          <Select<string>
+                            value={field.value.replaceAll(/\s/g, '')}
+                            onValueChange={(value) =>
+                              field.onChange(value ?? '')
+                            }
+                            items={[
+                              { value: '', label: t('Not configured') },
+                              { value: 'true', label: t('Enabled only') },
+                              { value: 'false', label: t('Disabled only') },
+                              {
+                                value: 'true,false',
+                                label: t('Enabled or disabled'),
+                              },
+                            ]}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value=''>
+                                {t('Not configured')}
+                              </SelectItem>
+                              <SelectItem value='true'>
+                                {t('Enabled only')}
+                              </SelectItem>
+                              <SelectItem value='false'>
+                                {t('Disabled only')}
+                              </SelectItem>
+                              <SelectItem value='true,false'>
+                                {t('Enabled or disabled')}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )
+                )}
+              </div>
+              <FormField
+                control={form.control}
+                name='group_parameter_overrides'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Group profile overrides')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        className='min-h-28 font-mono text-xs'
+                        placeholder='{"premium":{"video":{"durations":[4,8]}}}'
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Optional JSON keyed by group. Each listed allowlist replaces the matching model-level allowlist.'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

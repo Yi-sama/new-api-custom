@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -67,7 +70,23 @@ func registeredSystemTaskHandlers() []SystemTaskHandler {
 	systemTaskHandlersMu.RLock()
 	defer systemTaskHandlersMu.RUnlock()
 	handlers := make([]SystemTaskHandler, 0, len(systemTaskHandlers))
+	configuredTypes := strings.TrimSpace(os.Getenv("SYSTEM_TASK_TYPES"))
+	allowedTypes := strings.FieldsFunc(configuredTypes, func(r rune) bool {
+		return r == ',' || unicode.IsSpace(r)
+	})
 	for _, h := range systemTaskHandlers {
+		if configuredTypes != "" {
+			allowed := false
+			for _, taskType := range allowedTypes {
+				if taskType == h.Type() {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				continue
+			}
+		}
 		handlers = append(handlers, h)
 	}
 	return handlers
@@ -122,7 +141,9 @@ func notifySystemTaskRunner() {
 
 func StartSystemTaskRunner() {
 	systemTaskRunnerOnce.Do(func() {
-		if !common.IsMasterNode {
+		// An explicit type list permits a scoped worker without enabling all
+		// master-only maintenance and upstream checks on a serving node.
+		if !common.IsMasterNode && strings.TrimSpace(os.Getenv("SYSTEM_TASK_TYPES")) == "" {
 			return
 		}
 
@@ -142,7 +163,7 @@ func StartSystemTaskRunner() {
 				now := time.Now()
 				if now.Sub(lastStaleLockCleanup) >= systemTaskStaleLockInterval {
 					lastStaleLockCleanup = now
-					if err := model.ExpireStaleSystemTaskLocks(common.GetTimestamp()); err != nil {
+					if err := runSystemTaskStaleLockCleanup(); err != nil {
 						logger.LogWarn(context.Background(), fmt.Sprintf("system task stale lock cleanup failed: %v", err))
 					}
 				}
@@ -163,6 +184,21 @@ func StartSystemTaskRunner() {
 			}
 		})
 	})
+}
+
+func runSystemTaskStaleLockCleanup() error {
+	if strings.TrimSpace(os.Getenv("SYSTEM_TASK_TYPES")) == "" {
+		return model.ExpireStaleSystemTaskLocks(common.GetTimestamp())
+	}
+	handlers := registeredSystemTaskHandlers()
+	taskTypes := make([]string, 0, len(handlers))
+	for _, handler := range handlers {
+		taskTypes = append(taskTypes, handler.Type())
+	}
+	if len(taskTypes) == 0 {
+		return nil
+	}
+	return model.ExpireStaleSystemTaskLocks(common.GetTimestamp(), taskTypes...)
 }
 
 func StartLogCleanupTask(targetTimestamp int64) (*model.SystemTask, error) {

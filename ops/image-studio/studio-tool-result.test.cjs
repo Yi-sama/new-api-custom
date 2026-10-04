@@ -81,13 +81,13 @@ test('frontend patch routes only the display arguments through the helper', () =
   assert.equal((patched.match(/NewApiToolOutput\(/g) || []).length, 1)
 })
 
-test('image studio build entry and injected helpers use the v23 cache namespace', () => {
+test('image studio build entry and injected helpers use the v29 cache namespace', () => {
   const patchSource = readFileSync(join(directory, 'patch_frontend.py'), 'utf8')
   const dockerfile = readFileSync(join(directory, 'Dockerfile'), 'utf8')
 
-  assert.match(patchSource, /build \/ "studio-v23"/)
+  assert.match(patchSource, /build \/ "studio-v29"/)
   assert.doesNotMatch(patchSource, /\/static\/studio-[^"']+\?v=2[12]/)
   assert.match(dockerfile, /studio-tool-result\.js \/app\/build\/static\//)
-  assert.match(dockerfile, /studio-link\.js\?v=24/)
-  assert.match(dockerfile, /billing-link\.js\?v=24/)
+  assert.match(dockerfile, /\/studio-v29\/custom\/studio-link\.js\?v=29/)
+  assert.match(dockerfile, /\/studio-v29\/custom\/billing-link\.js\?v=29/)
 })

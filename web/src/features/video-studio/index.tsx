@@ -54,15 +54,76 @@ export function VideoStudio() {
   const currentError = error?.loadKey === loadKey ? error.message : null
   const ready = readyKey === loadKey
 
-  const sendSession = useCallback(
-    (target?: Window | null) => {
-      if (!currentSession || !target) return
-      target.postMessage(
-        { type: 'new-api-video-session', session: currentSession.data },
+  const postSession = useCallback(
+    (target: Window | null | undefined, data: VideoStudioSession) => {
+      target?.postMessage(
+        { type: 'new-api-video-session', session: data },
         window.location.origin
       )
     },
-    [currentSession]
+    []
+  )
+
+  const sendSession = useCallback(
+    (target?: Window | null) => {
+      if (!currentSession || !target) return
+      postSession(target, currentSession.data)
+    },
+    [currentSession, postSession]
+  )
+
+  const renewSession = useCallback(
+    (target: Window | null) => {
+      const expectedUserId = user?.id
+      const expectedUsername = user?.username
+      const expectedSid = sid
+      const renewalError = t(
+        'Unable to renew Video Studio. Please sign in again.'
+      )
+
+      if (!target) return
+      const currentAuth = useAuthStore.getState().auth
+      if (
+        !expectedUserId ||
+        !expectedUsername ||
+        currentAuth.user?.id !== expectedUserId ||
+        currentAuth.user?.username !== expectedUsername ||
+        currentAuth.session?.sid !== expectedSid
+      ) {
+        target.postMessage(
+          { type: 'new-api-video-session-error', message: renewalError },
+          window.location.origin
+        )
+        return
+      }
+
+      void createVideoStudioSession()
+        .then((data) => {
+          const auth = useAuthStore.getState().auth
+          if (
+            data.user_id !== expectedUserId ||
+            data.username !== expectedUsername ||
+            auth.user?.id !== expectedUserId ||
+            auth.user?.username !== expectedUsername ||
+            auth.session?.sid !== expectedSid
+          ) {
+            target.postMessage(
+              { type: 'new-api-video-session-error', message: renewalError },
+              window.location.origin
+            )
+            return
+          }
+          setSession({ loadKey, data })
+          postSession(target, data)
+        })
+        .catch(() => {
+          target.postMessage(
+            { type: 'new-api-video-session-error', message: renewalError },
+            window.location.origin
+          )
+        })
+    },
+    [loadKey, postSession, sid, t, user?.id, user?.username]
   )
 
   useEffect(() => {
@@ -104,8 +165,17 @@ export function VideoStudio() {
         return
       }
 
-      if (event.data?.type === 'new-api-video-request-session') {
-        sendSession(event.source as Window)
+      if (
+        event.data?.type === 'new-api-video-request-session' &&
+        currentSession
+      ) {
+        if (currentSession.data.expires_at > Date.now() / 1000) {
+          sendSession(event.source as Window)
+        } else {
+          renewSession(event.source as Window)
+        }
+      } else if (event.data?.type === 'new-api-video-renew-session') {
+        renewSession(event.source as Window)
       } else if (event.data?.type === 'new-api-video-ready') {
         setReadyKey(loadKey)
         setError(null)
@@ -120,7 +190,7 @@ export function VideoStudio() {
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [loadKey, sendSession])
+  }, [currentSession, loadKey, renewSession, sendSession])
 
   return (
     <Main className='bg-background h-dvh w-full'>

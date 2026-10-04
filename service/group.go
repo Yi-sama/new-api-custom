@@ -169,6 +169,54 @@ func GetGroupsEnabledImageModels(groups []string) []string {
 	return imageModels
 }
 
+// GetGroupsEnabledChatModels exposes models usable by Chat Completions.
+// Explicit model endpoints take precedence over generic channel inference.
+func GetGroupsEnabledChatModels(groups []string) ([]string, error) {
+	abilities, err := model.GetAllEnableAbilityWithChannels()
+	if err != nil {
+		return nil, err
+	}
+	endpoints, _, _, disabled, err := videoStudioMetadataEndpoints(abilities)
+	if err != nil {
+		return nil, err
+	}
+	allowedGroups := make(map[string]bool, len(groups))
+	for _, group := range groups {
+		allowedGroups[group] = true
+	}
+	chatModels := make(map[string]bool)
+	for _, ability := range abilities {
+		if !allowedGroups[ability.Group] || disabled[ability.Model] ||
+			ability.Model == AutoModelName || common.IsImageGenerationModel(ability.Model) {
+			continue
+		}
+		supported := endpoints[ability.Model]
+		if len(supported) == 0 {
+			supported = common.GetEndpointTypesByChannelType(ability.ChannelType, ability.Model)
+			if ability.ChannelType == constant.ChannelTypeAdvancedCustom {
+				channel, err := model.GetChannelById(ability.ChannelId, true)
+				if err != nil {
+					return nil, err
+				}
+				supported = videoStudioChannelEndpoints(channel, ability.Model)
+			}
+		}
+		for _, endpoint := range supported {
+			if endpoint == constant.EndpointTypeOpenAI {
+				chatModels[ability.Model] = true
+				break
+			}
+		}
+	}
+	result := make([]string, 0)
+	for _, modelName := range GetGroupsEnabledModels(groups) {
+		if chatModels[modelName] {
+			result = append(result, modelName)
+		}
+	}
+	return result, nil
+}
+
 // GetUserGroupRatio 获取用户使用某个分组的倍率
 // userGroup 用户分组
 // group 需要获取倍率的分组

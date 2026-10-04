@@ -49,6 +49,7 @@ $env:ENABLE_PPROF = 'false'
 $env:TRUSTED_PROXIES = 'none'
 $env:CHANNEL_UPSTREAM_MODEL_UPDATE_TASK_ENABLED = 'false'
 $env:VIDEO_STUDIO_DIST_DIR = (Resolve-Path -LiteralPath $CanvasDist).Path
+$env:VIDEO_STUDIO_DATA_DIR = Join-Path $RuntimeRoot 'studio-data'
 $studioSecret = Join-Path $projectRoot '.local-tests\image-studio-session-secret'
 if (Test-Path -LiteralPath $studioSecret -PathType Leaf) {
     $env:SESSION_SECRET = (Get-Content -Raw -LiteralPath $studioSecret).Trim()

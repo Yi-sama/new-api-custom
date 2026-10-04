@@ -245,6 +245,41 @@ func TestGetUserModelsImageModalityExcludesChatModels(t *testing.T) {
 	require.Equal(t, []string{"gpt-image-1"}, decodeUserModelsResponse(t, recorder))
 }
 
+func TestGetUserModelsChatModalityExcludesNonChatAndAutoModels(t *testing.T) {
+	db := setupModelListControllerTestDB(t)
+	require.NoError(t, db.Create(&model.User{
+		Id: 1005, Username: "tavern-model-user", Password: "password",
+		Group: "default", Status: common.UserStatusEnabled,
+	}).Error)
+	require.NoError(t, db.Create(&model.Channel{
+		Id: 1, Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled, Key: "fixture",
+	}).Error)
+	require.NoError(t, db.Create(&[]model.Ability{
+		{Group: "default", Model: "gpt-4o", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "gpt-image-1", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "gpt-image-2", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "gpt-image-2.5-sunburst", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "custom-image", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "custom-embedding", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "custom-multimodal", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "o3-pro", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: service.AutoModelName, ChannelId: 1, Enabled: true},
+	}).Error)
+	require.NoError(t, db.Create(&[]model.Model{
+		{ModelName: "custom-image", Endpoints: `{"image-generation":"/v1/images/generations"}`, Status: 1},
+		{ModelName: "custom-embedding", Endpoints: `{"embeddings":"/v1/embeddings"}`, Status: 1},
+		{ModelName: "custom-multimodal", Endpoints: `{"openai":"/v1/chat/completions","image-generation":"/v1/images/generations"}`, Status: 1},
+	}).Error)
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/user/models?group=default&modality=chat", nil)
+	context.Set("id", 1005)
+
+	GetUserModels(context)
+
+	assert.ElementsMatch(t, []string{"gpt-4o", "custom-multimodal"}, decodeUserModelsResponse(t, recorder))
+}
+
 func TestGetUserModelsExpandsAutoGroupsInConfiguredOrder(t *testing.T) {
 	originalAutoGroups := setting.AutoGroups2JsonString()
 	originalUsableGroups := setting.UserUsableGroups2JSONString()

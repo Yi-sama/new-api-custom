@@ -4,6 +4,7 @@ const http = require('node:http')
 const users = new Map([
   ['901', { id: 901, username: 'fixture_alice', display_name: 'TEST FIXTURE / Alice', role: 1, status: 1, group: 'default', quota: 5000000 }],
   ['902', { id: 902, username: 'fixture_bob', display_name: 'TEST FIXTURE / Bob', role: 1, status: 1, group: 'default', quota: 9000000 }],
+  ['903', { id: 903, username: 'fixture_managed', display_name: 'TEST FIXTURE / Managed UI', role: 1, status: 1, group: 'default', quota: 5000000 }],
 ])
 const revoked = new Set()
 const requests = []
@@ -17,7 +18,7 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1:3211')
   if (url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html' })
-    return res.end('<h1>Isolated AgnAI integration fixture</h1><p>All balances and replies here are synthetic.</p><a href="/test/connect?user=901">Test Alice</a><br><a href="/test/connect?user=902">Test Bob</a>')
+    return res.end('<h1>Isolated RisuAI integration fixture</h1><p>All balances and replies here are synthetic.</p><a href="/test/connect?user=901">Test Alice</a><br><a href="/test/connect?user=902">Test Bob</a>')
   }
   if (url.pathname === '/test/connect') {
     const id = url.searchParams.get('user')
@@ -25,7 +26,7 @@ http.createServer(async (req, res) => {
     revoked.delete(id)
     res.writeHead(302, {
       'Set-Cookie': `new_api_refresh=fixture-${id}; HttpOnly; SameSite=Strict; Path=/api/user/auth`,
-      Location: 'http://127.0.0.1:3210/character/list?connect=1',
+      Location: 'http://127.0.0.1:3210/?connect=1',
     })
     return res.end()
   }
@@ -42,10 +43,10 @@ http.createServer(async (req, res) => {
     return json(res, 200, { success: !!user })
   }
   if (url.pathname === '/api/status') {
-    return json(res, 200, { success: true, data: { quota_per_unit: 500000, quota_display_type: 'USD', usd_exchange_rate: 7 } })
+    return json(res, 200, { success: true, data: { system_name: 'Fixture Portal', quota_per_unit: 500000, quota_display_type: 'USD', usd_exchange_rate: 7 } })
   }
   if (url.pathname === '/api/user/auth/refresh' || url.pathname === '/api/user/auth/logout') {
-    const match = /(?:^|;\s*)new_api_refresh=fixture-(901|902)(?:;|$)/.exec(req.headers.cookie || '')
+    const match = /(?:^|;\s*)new_api_refresh=fixture-(901|902|903)(?:;|$)/.exec(req.headers.cookie || '')
     const id = match?.[1]
     if (!id || revoked.has(id)) return json(res, 401, { success: false, message: 'Fixture sign-in required' })
     const sid = `fixture-sid-${id}`
@@ -64,15 +65,17 @@ http.createServer(async (req, res) => {
       user: users.get(id), session: { sid, current: true, expires_at: Math.floor(Date.now() / 1000) + 86400 },
     } })
   }
-  const id = /^Bearer fixture-access-(901|902)$/.exec(req.headers.authorization || '')?.[1]
+  const id = /^Bearer fixture-access-(901|902|903)$/.exec(req.headers.authorization || '')?.[1]
   const user = users.get(id)
   if (!user || revoked.has(id)) return json(res, 401, { success: false, message: 'Fixture session revoked' })
   if (url.pathname === '/api/user/self') return json(res, 200, { success: true, data: user })
   if (url.pathname === '/api/user/self/groups') {
-    return json(res, 200, { success: true, data: { default: { desc: 'Fixture standard', ratio: 1 }, premium: { desc: 'Fixture premium', ratio: 2 } } })
+    return json(res, 200, { success: true, data: { default: { desc: 'Fixture standard', ratio: 1 }, premium: { desc: 'Fixture premium', ratio: 2 }, images: { desc: 'Fixture image only', ratio: 1 }, 'auto-only': { desc: 'Fixture Auto only', ratio: 1 } } })
   }
   if (url.pathname === '/api/user/models') {
     const group = url.searchParams.get('group')
+    if (group === 'images') return json(res, 200, { success: true, data: [] })
+    if (group === 'auto-only') return json(res, 200, { success: true, data: ['Auto'] })
     if (!['default', 'premium'].includes(group)) return json(res, 403, { success: false })
     return json(res, 200, { success: true, data: group === 'premium' ? ['fixture-premium'] : ['fixture-chat', 'fixture-chat-2'] })
   }
@@ -86,7 +89,7 @@ http.createServer(async (req, res) => {
     if (user.quota < 12500) return json(res, 403, { error: { message: 'Fixture insufficient balance' } })
     user.quota -= 12500
     requests.push({ userId: user.id, model: body.model, group: body.group, stream: body.stream, messages: body.messages })
-    const reply = 'This is an isolated AgnAI integration test reply. No paid model was called.'
+    const reply = 'This is an isolated RisuAI integration test reply. No paid model was called.'
     if (!body.stream) return json(res, 200, {
       id: 'fixture-chat', object: 'chat.completion', model: body.model,
       choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: reply } }],
