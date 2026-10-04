@@ -1,0 +1,48 @@
+{
+  "services": {
+    "risuai": {
+      "image": "sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1",
+      "container_name": "risuai-production-20261003",
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "working_dir": "/app",
+      "command": ["node", "server.cjs"],
+      "mem_limit": "512m",
+      "environment": {
+        "PORT": "32831",
+        "TRUST_PROXY": "loopback",
+        "NEW_API_URL": "http://127.0.0.1:32794",
+        "NEW_API_PORTAL_URL": "https://api.yisama.asia",
+        "NEW_API_PUBLIC_URL": "https://api.yisama.asia",
+        "NEW_API_DATA_DIR": "/data",
+        "TAVERN_SERVICE_KEY_FILE": "/run/new-api/tavern-service.key"
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/opt/us-whitelist/releases/production-suite-20261003-001/risuai-managed",
+          "target": "/app",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "source": "/opt/us-whitelist/runtime/tavern-production/data",
+          "target": "/data"
+        },
+        {
+          "type": "bind",
+          "source": "/opt/us-whitelist/runtime/tavern-production/tavern-service.key",
+          "target": "/run/new-api/tavern-service.key",
+          "read_only": true
+        }
+      ],
+      "healthcheck": {
+        "test": ["CMD", "node", "-e", "fetch('http://127.0.0.1:32831/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 3,
+        "start_period": "15s"
+      }
+    }
+  }
+}

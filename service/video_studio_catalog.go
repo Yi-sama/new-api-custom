@@ -10,8 +10,9 @@ import (
 )
 
 type VideoStudioCatalogModel struct {
-	ID           string   `json:"id"`
-	Capabilities []string `json:"capabilities"`
+	ID           string                       `json:"id"`
+	Capabilities []string                     `json:"capabilities"`
+	Parameters   *model.StudioModelParameters `json:"parameters,omitempty"`
 }
 
 type VideoStudioCatalogGroup struct {
@@ -33,16 +34,16 @@ func GetVideoStudioCatalog(userGroup string) ([]VideoStudioCatalogGroup, error) 
 		return make([]VideoStudioCatalogGroup, 0), nil
 	}
 
-	metadataEndpoints, metadataAudio, disabledModels, err := videoStudioMetadataEndpoints()
+	abilities, err := model.GetAllEnableAbilityWithChannels()
 	if err != nil {
 		return nil, err
 	}
-	abiliites, err := model.GetAllEnableAbilityWithChannels()
+	metadataEndpoints, metadataAudio, metadataParameters, disabledModels, err := videoStudioMetadataEndpoints(abilities)
 	if err != nil {
 		return nil, err
 	}
 	channels := make(map[int]*model.Channel)
-	for _, ability := range abiliites {
+	for _, ability := range abilities {
 		groupModels, ok := modelsByGroup[ability.Group]
 		modelName := strings.TrimSpace(ability.Model)
 		if !ok || modelName == "" || disabledModels[modelName] {
@@ -76,12 +77,14 @@ func GetVideoStudioCatalog(userGroup string) ([]VideoStudioCatalogGroup, error) 
 	for group, models := range modelsByGroup {
 		catalogModels := make([]VideoStudioCatalogModel, 0, len(models))
 		for modelName, capabilities := range models {
-			if !capabilities["video"] {
+			capabilityList := videoStudioCapabilityList(capabilities)
+			if len(capabilityList) == 0 {
 				continue
 			}
 			catalogModels = append(catalogModels, VideoStudioCatalogModel{
 				ID:           modelName,
-				Capabilities: videoStudioCapabilityList(capabilities),
+				Capabilities: capabilityList,
+				Parameters:   metadataParameters[modelName],
 			})
 		}
 		if len(catalogModels) == 0 {
@@ -112,30 +115,89 @@ func IsVideoStudioGroupVideoModel(userGroup, group, modelName string) (bool, err
 			continue
 		}
 		for _, entryModel := range entry.Models {
-			if entryModel.ID == modelName {
-				return true, nil
+			if entryModel.ID != modelName {
+				continue
 			}
+			for _, capability := range entryModel.Capabilities {
+				if capability == "video" {
+					return true, nil
+				}
+			}
+			return false, nil
 		}
 	}
 	return false, nil
 }
 
-func videoStudioMetadataEndpoints() (map[string][]constant.EndpointType, map[string]bool, map[string]bool, error) {
+func videoStudioMetadataEndpoints(abilities []model.AbilityWithChannel) (map[string][]constant.EndpointType, map[string]bool, map[string]*model.StudioModelParameters, map[string]bool, error) {
 	var metadata []model.Model
 	if err := model.DB.Find(&metadata).Error; err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	endpointsByModel := make(map[string][]constant.EndpointType, len(metadata))
+	metadataByModel := make(map[string]*model.Model)
+	prefixRules := make([]*model.Model, 0)
+	suffixRules := make([]*model.Model, 0)
+	containsRules := make([]*model.Model, 0)
+	for i := range metadata {
+		entry := &metadata[i]
+		switch entry.NameRule {
+		case model.NameRuleExact:
+			metadataByModel[entry.ModelName] = entry
+		case model.NameRulePrefix:
+			prefixRules = append(prefixRules, entry)
+		case model.NameRuleSuffix:
+			suffixRules = append(suffixRules, entry)
+		case model.NameRuleContains:
+			containsRules = append(containsRules, entry)
+		}
+	}
+	for _, entry := range prefixRules {
+		for _, ability := range abilities {
+			if strings.HasPrefix(ability.Model, entry.ModelName) {
+				if _, exists := metadataByModel[ability.Model]; !exists {
+					metadataByModel[ability.Model] = entry
+				}
+			}
+		}
+	}
+	for _, entry := range suffixRules {
+		for _, ability := range abilities {
+			if strings.HasSuffix(ability.Model, entry.ModelName) {
+				if _, exists := metadataByModel[ability.Model]; !exists {
+					metadataByModel[ability.Model] = entry
+				}
+			}
+		}
+	}
+	for _, entry := range containsRules {
+		for _, ability := range abilities {
+			if strings.Contains(ability.Model, entry.ModelName) {
+				if _, exists := metadataByModel[ability.Model]; !exists {
+					metadataByModel[ability.Model] = entry
+				}
+			}
+		}
+	}
+
+	endpointsByModel := make(map[string][]constant.EndpointType, len(metadataByModel))
 	audioByModel := make(map[string]bool)
+	parametersByModel := make(map[string]*model.StudioModelParameters)
 	disabledModels := make(map[string]bool)
-	for _, entry := range metadata {
-		modelName := strings.TrimSpace(entry.ModelName)
+	for modelName, entry := range metadataByModel {
+		modelName = strings.TrimSpace(modelName)
 		if modelName == "" {
 			continue
 		}
 		if entry.Status != 1 {
 			disabledModels[modelName] = true
 			continue
+		}
+		if strings.TrimSpace(entry.Parameters) != "" {
+			parameters, err := model.ParseStudioModelParameters(entry.Parameters)
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+			parametersByModel[modelName] = &parameters
 		}
 		if strings.TrimSpace(entry.Endpoints) == "" {
 			continue
@@ -154,7 +216,7 @@ func videoStudioMetadataEndpoints() (map[string][]constant.EndpointType, map[str
 			}
 		}
 	}
-	return endpointsByModel, audioByModel, disabledModels, nil
+	return endpointsByModel, audioByModel, parametersByModel, disabledModels, nil
 }
 
 func videoStudioMetadataAudioPath(value interface{}) bool {

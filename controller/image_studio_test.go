@@ -33,7 +33,7 @@ func setupImageStudioSession(t *testing.T, role int) (service.AuthIdentity, *mod
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Log{}, &model.ImageStudioCredit{}))
 	model.DB, model.LOG_DB = db, db
 	common.RedisEnabled = false
 	common.SessionSecret = "image-studio-test-session-secret"
@@ -109,6 +109,42 @@ func TestImageStudioConfigAndRoleMapping(t *testing.T) {
 	t.Setenv("IMAGE_STUDIO_IDENTITY_EMAIL_FORMAT", "owui-{id}@{domain}")
 	t.Setenv("IMAGE_STUDIO_COOKIE_DOMAIN", "com")
 	assert.False(t, ImageStudioEnabled())
+}
+
+func TestImageStudioFirstEntryGiftRequiresLiveIdentityAndNeverResets(t *testing.T) {
+	setImageStudioTestEnv(t)
+	identity, session := setupImageStudioSession(t, common.RoleCommonUser)
+	router := gin.New()
+	router.GET("/identity", GetImageStudioIdentity)
+	anonymous := httptest.NewRecorder()
+	router.ServeHTTP(anonymous, httptest.NewRequest(http.MethodGet, "/identity", nil))
+	require.Equal(t, http.StatusUnauthorized, anonymous.Code)
+	var count int64
+	require.NoError(t, model.DB.Model(&model.ImageStudioCredit{}).Count(&count).Error)
+	assert.Zero(t, count)
+	token, _, err := service.IssueImageStudioToken(identity, "user", time.Unix(session.ExpiresAt, 0))
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodGet, "/identity", nil)
+	request.AddCookie(&http.Cookie{Name: imageStudioCookieName, Value: token})
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	require.Equal(t, http.StatusNoContent, recorder.Code)
+	credit, err := model.GetImageStudioCredit(identity.UserID)
+	require.NoError(t, err)
+	require.Equal(t, common.QuotaFromFloat(common.QuotaPerUnit), credit.Quota)
+	reserved, err := model.ReserveImageStudioCredit(identity.UserID, credit.Quota)
+	require.NoError(t, err)
+	assert.Equal(t, credit.Quota, reserved)
+	request = httptest.NewRequest(http.MethodGet, "/identity", nil)
+	request.AddCookie(&http.Cookie{Name: imageStudioCookieName, Value: token})
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	require.Equal(t, http.StatusNoContent, recorder.Code)
+	credit, err = model.GetImageStudioCredit(identity.UserID)
+	require.NoError(t, err)
+	assert.Zero(t, credit.Quota)
+	require.NoError(t, model.DB.Model(&model.ImageStudioCredit{}).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
 }
 
 func TestStatusReportsImageStudioEnabled(t *testing.T) {
@@ -256,8 +292,10 @@ func TestImageStudioBillingReturnsAuthenticatedUserQuota(t *testing.T) {
 	var response struct {
 		RemainingQuota int `json:"remaining_quota"`
 		UsedQuota      int `json:"used_quota"`
+		GiftQuota      int `json:"studio_gift_quota"`
 	}
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
 	assert.Equal(t, 123456, response.RemainingQuota)
 	assert.Equal(t, 654321, response.UsedQuota)
+	assert.Equal(t, common.QuotaFromFloat(common.QuotaPerUnit), response.GiftQuota)
 }

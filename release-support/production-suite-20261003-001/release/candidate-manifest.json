@@ -1,0 +1,46 @@
+{
+  "release": "production-suite-20261003-001",
+  "version": "v1.0.0-rc.28-custom-production-suite-20261003-001",
+  "status": "ready_for_deferred_notice_rollout",
+  "approved_features": [
+    "profitability",
+    "tavern",
+    "video-studio"
+  ],
+  "workstation_policy": "retain_current_production_release",
+  "workstation_frontend_release": "20261003-2325-account-balance-v29",
+  "workstation_backend_fix_retained": "20261003-web-image-512-v28",
+  "uploaded": false,
+  "activated": false,
+  "production_baseline_sha256": "bafd36f8629e154b271f4b93e65a4b049657532364482a28c534e5fd28142d85",
+  "backend_sha256": "2c205bf966a6d300b8b3a4086329baa4af1f2234973974641b76c7e334d4a7db",
+  "schema_tool_sha256": "22926aaff1210c381cc85c5cd5c9428a541c3e23c32e00e40c3f9e8dee50c191",
+  "new_api_source_files": 2225,
+  "new_api_source_hash_mismatches": 0,
+  "web_tests": {
+    "files_passed": 10,
+    "tests_passed": 65
+  },
+  "risu_tests": {
+    "files_passed": 30,
+    "tests_passed": 252,
+    "tests_skipped": 3
+  },
+  "risu_http_tests_passed": 19,
+  "migration_tests_passed": 2,
+  "confirmed_scope_go_tests_passed": 91,
+  "confirmed_scope_go_pass_events_including_subtests": 156,
+  "risu_runtime_bundle_sha256": "dc502ba47a5c3d5129725a7968ae09df0e021aedea2c98adb5d8ce9d7f0c5ccf",
+  "risu_runtime_bundle_syntax": "pass",
+  "tavern_use": "public",
+  "production_user_agreement_configured": false,
+  "production_privacy_policy_configured": false,
+  "tavern_production_build": "built_with_native_unconfigured_notice",
+  "production_backup": "not_created_this_release",
+  "production_database_migration": "not_run",
+  "production_visual_verification": "not_run",
+  "real_paid_calls": 0,
+  "candidate_visual_verification": "desktop_1440_and_mobile_390_pass_synthetic_account",
+  "mobile_header_overflow_fixed": true,
+  "legal_configuration_deferred": true
+}

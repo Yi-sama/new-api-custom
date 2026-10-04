@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 
-import { getAgnaiUrl } from './agnai-url'
+import { getRisuaiUrl } from './risuai-url'
 
 type TavernProps = {
   navigate?: (url: string) => void
@@ -32,7 +32,7 @@ export function Tavern(props: TavernProps) {
   const { t } = useTranslation()
   let target: string | undefined
   try {
-    target = getAgnaiUrl(window.location.origin)
+    target = getRisuaiUrl(window.location.origin)
   } catch {
     target = undefined
   }
@@ -48,7 +48,7 @@ export function Tavern(props: TavernProps) {
   return (
     <main className='bg-background flex min-h-dvh items-center justify-center p-6'>
       <div className='flex max-w-sm flex-col items-center gap-4'>
-        <h1 className='text-xl font-semibold'>AgnAI</h1>
+        <h1 className='text-xl font-semibold'>RisuAI</h1>
         {target ? (
           <Button render={<a href={target} />}>
             <ExternalLink aria-hidden='true' />

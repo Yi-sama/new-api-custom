@@ -97,6 +97,10 @@ func CreateModelMeta(c *gin.Context) {
 		common.ApiErrorMsg(c, "模型名称不能为空")
 		return
 	}
+	if _, err := model.ParseStudioModelParameters(m.Parameters); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
 	// 名称冲突检查
 	if dup, err := model.IsModelNameDuplicated(0, m.ModelName); err != nil {
 		common.ApiError(c, err)
@@ -135,6 +139,10 @@ func UpdateModelMeta(c *gin.Context) {
 			return
 		}
 	} else {
+		if _, err := model.ParseStudioModelParameters(m.Parameters); err != nil {
+			common.ApiErrorMsg(c, err.Error())
+			return
+		}
 		// 名称冲突检查
 		if dup, err := model.IsModelNameDuplicated(m.Id, m.ModelName); err != nil {
 			common.ApiError(c, err)

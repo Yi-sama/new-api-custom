@@ -60,7 +60,7 @@ func TestImageStudioMetadataRemainsAuthenticatedDuringRelayOverload(t *testing.T
 		model.DB, common.RedisEnabled, common.SessionSecret = oldDB, oldRedis, oldSecret
 		require.NoError(t, sqlDB.Close())
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Channel{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Channel{}, &model.ImageStudioCredit{}))
 	user := model.User{Username: "studio-router-user", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1}
 	require.NoError(t, db.Create(&user).Error)
 	expires := time.Now().Add(time.Hour)

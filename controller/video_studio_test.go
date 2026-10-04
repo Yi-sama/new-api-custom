@@ -328,7 +328,7 @@ func TestVideoStudioCatalogFiltersGroupsAndModelsByCapabilities(t *testing.T) {
 	require.NoError(t, model.DB.AutoMigrate(&model.Channel{}, &model.Ability{}, &model.Model{}))
 
 	channels := []*model.Channel{
-		{Type: constant.ChannelTypeOpenAI, Key: "llm-key", Status: common.ChannelStatusEnabled, Name: "llm", Group: "default", Models: "gpt-4o"},
+		{Type: constant.ChannelTypeOpenAI, Key: "llm-key", Status: common.ChannelStatusEnabled, Name: "llm", Group: "default", Models: "gpt-4o,image-only"},
 		{Type: constant.ChannelTypeSora, Key: "video-key", Status: common.ChannelStatusEnabled, Name: "video", Group: "default", Models: "sora-main,disabled-video"},
 		{Type: constant.ChannelTypeOpenAI, Key: "custom-key", Status: common.ChannelStatusEnabled, Name: "custom", Group: unicodeGroup, Models: "custom-video"},
 		{Type: constant.ChannelTypeSora, Key: "disabled-key", Status: common.ChannelStatusManuallyDisabled, Name: "disabled", Group: unicodeGroup, Models: "disabled-channel-video"},
@@ -339,6 +339,7 @@ func TestVideoStudioCatalogFiltersGroupsAndModelsByCapabilities(t *testing.T) {
 	}
 	require.NoError(t, model.DB.Create(&[]model.Ability{
 		{Group: "default", Model: "gpt-4o", ChannelId: channels[0].Id, Enabled: true},
+		{Group: "default", Model: "image-only", ChannelId: channels[0].Id, Enabled: true},
 		{Group: "default", Model: "sora-main", ChannelId: channels[1].Id, Enabled: true},
 		{Group: "default", Model: "disabled-video", ChannelId: channels[1].Id, Enabled: true},
 		{Group: unicodeGroup, Model: "sora-main", ChannelId: channels[1].Id, Enabled: true},
@@ -347,7 +348,8 @@ func TestVideoStudioCatalogFiltersGroupsAndModelsByCapabilities(t *testing.T) {
 		{Group: "llm-only", Model: "gpt-4o-mini", ChannelId: channels[4].Id, Enabled: true},
 	}).Error)
 	require.NoError(t, model.DB.Create(&[]model.Model{
-		{ModelName: "custom-video", Status: 1, Endpoints: `{"openai-video":"/v1/videos","openai":{"path":"/v1/audio/speech"}}`},
+		{ModelName: "custom-", NameRule: model.NameRulePrefix, Status: 1, Endpoints: `{"openai-video":"/v1/videos","openai":{"path":"/v1/audio/speech"}}`},
+		{ModelName: "image-only", Status: 1, Endpoints: `{"image-generation":"/v1/images/generations"}`},
 		{ModelName: "disabled-video", Status: 1, Endpoints: `{"openai-video":"/v1/videos"}`},
 	}).Error)
 	require.NoError(t, model.DB.Model(&model.Model{}).Where("model_name = ?", "disabled-video").Update("status", 0).Error)
@@ -371,15 +373,21 @@ func TestVideoStudioCatalogFiltersGroupsAndModelsByCapabilities(t *testing.T) {
 	}
 	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &catalog))
 	require.True(t, catalog.Success)
-	require.Len(t, catalog.Data.Groups, 2)
+	require.Len(t, catalog.Data.Groups, 3)
 	assert.Equal(t, "default", catalog.Data.Groups[0].ID)
-	assert.Equal(t, []service.VideoStudioCatalogModel{{ID: "sora-main", Capabilities: []string{"video"}}}, catalog.Data.Groups[0].Models)
-	assert.Equal(t, unicodeGroup, catalog.Data.Groups[1].ID)
-	assert.Equal(t, 2.0, catalog.Data.Groups[1].Ratio)
+	assert.Equal(t, []service.VideoStudioCatalogModel{
+		{ID: "gpt-4o", Capabilities: []string{"text"}},
+		{ID: "image-only", Capabilities: []string{"image", "text"}},
+		{ID: "sora-main", Capabilities: []string{"video"}},
+	}, catalog.Data.Groups[0].Models)
+	assert.Equal(t, "llm-only", catalog.Data.Groups[1].ID)
+	assert.Equal(t, []service.VideoStudioCatalogModel{{ID: "gpt-4o-mini", Capabilities: []string{"text"}}}, catalog.Data.Groups[1].Models)
+	assert.Equal(t, unicodeGroup, catalog.Data.Groups[2].ID)
+	assert.Equal(t, 2.0, catalog.Data.Groups[2].Ratio)
 	assert.Equal(t, []service.VideoStudioCatalogModel{
 		{ID: "custom-video", Capabilities: []string{"video", "text", "audio"}},
 		{ID: "sora-main", Capabilities: []string{"video"}},
-	}, catalog.Data.Groups[1].Models)
+	}, catalog.Data.Groups[2].Models)
 
 	request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
@@ -390,6 +398,15 @@ func TestVideoStudioCatalogFiltersGroupsAndModelsByCapabilities(t *testing.T) {
 	assert.Contains(t, response.Body.String(), `"id":"custom-video"`)
 	assert.Contains(t, response.Body.String(), `"id":"sora-main"`)
 	assert.NotContains(t, response.Body.String(), "gpt-4o")
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), `"id":"sora-main"`)
+	assert.NotContains(t, response.Body.String(), "gpt-4o")
+	assert.NotContains(t, response.Body.String(), "image-only")
 }
 
 func TestVideoStudioRejectsUnauthorizedOrMalformedSelectedGroup(t *testing.T) {
@@ -433,28 +450,35 @@ func TestVideoStudioRejectsNonVideoModelBeforeBilling(t *testing.T) {
 	}).Error)
 	token, _, err := service.IssueVideoStudioToken(identity, time.Unix(session.ExpiresAt, 0))
 	require.NoError(t, err)
-	channel := &model.Channel{Type: constant.ChannelTypeOpenAI, Key: "llm-key", Status: common.ChannelStatusEnabled, Name: "llm-only", Group: "default", Models: "gpt-4o"}
+	channel := &model.Channel{Type: constant.ChannelTypeOpenAI, Key: "llm-key", Status: common.ChannelStatusEnabled, Name: "llm-only", Group: "default", Models: "gpt-4o,image-only"}
 	require.NoError(t, model.DB.Create(channel).Error)
-	require.NoError(t, model.DB.Create(&model.Ability{Group: "default", Model: "gpt-4o", ChannelId: channel.Id, Enabled: true}).Error)
+	require.NoError(t, model.DB.Create(&[]model.Ability{
+		{Group: "default", Model: "gpt-4o", ChannelId: channel.Id, Enabled: true},
+		{Group: "default", Model: "image-only", ChannelId: channel.Id, Enabled: true},
+	}).Error)
+	require.NoError(t, model.DB.Create(&model.Model{ModelName: "image-only", Status: 1, Endpoints: `{"image-generation":"/v1/images/generations"}`}).Error)
 
-	request := videoStudioMultipartVideoRequest(t, token)
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	require.NoError(t, writer.WriteField("model", "gpt-4o"))
-	require.NoError(t, writer.WriteField("prompt", "must not bill"))
-	require.NoError(t, writer.Close())
-	request = httptest.NewRequest(http.MethodPost, "/api/video-studio/v1/videos", &body)
-	request.Header.Set("Content-Type", writer.FormDataContentType())
-	request.Header.Set("Authorization", "Bearer "+token)
-	response := httptest.NewRecorder()
-	videoStudioRelayTestRouter().ServeHTTP(response, request)
-	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
-	quota, err := model.GetUserQuota(identity.UserID, false)
-	require.NoError(t, err)
-	assert.Equal(t, initialQuota, quota)
-	var tasks int64
-	require.NoError(t, model.DB.Model(&model.Task{}).Count(&tasks).Error)
-	assert.Zero(t, tasks)
+	for _, modelName := range []string{"gpt-4o", "image-only"} {
+		t.Run(modelName, func(t *testing.T) {
+			var body bytes.Buffer
+			writer := multipart.NewWriter(&body)
+			require.NoError(t, writer.WriteField("model", modelName))
+			require.NoError(t, writer.WriteField("prompt", "must not bill"))
+			require.NoError(t, writer.Close())
+			request := httptest.NewRequest(http.MethodPost, "/api/video-studio/v1/videos", &body)
+			request.Header.Set("Content-Type", writer.FormDataContentType())
+			request.Header.Set("Authorization", "Bearer "+token)
+			response := httptest.NewRecorder()
+			videoStudioRelayTestRouter().ServeHTTP(response, request)
+			require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+			quota, err := model.GetUserQuota(identity.UserID, false)
+			require.NoError(t, err)
+			assert.Equal(t, initialQuota, quota)
+			var tasks int64
+			require.NoError(t, model.DB.Model(&model.Task{}).Count(&tasks).Error)
+			assert.Zero(t, tasks)
+		})
+	}
 }
 
 func TestVideoStudioSelectedGroupIsUsedForChargeAndTaskSnapshot(t *testing.T) {

@@ -164,7 +164,26 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interf
 	if relayInfo.UserSetting.BillingPreference != "" {
 		other["billing_preference"] = relayInfo.UserSetting.BillingPreference
 	}
-	if relayInfo.BillingSource == "subscription" {
+	if relayInfo.BillingSource == BillingSourceTavern {
+		other["tavern_gift_consumed"] = relayInfo.TavernGiftConsumed
+		other["tavern_paid_consumed"] = relayInfo.TavernPaidConsumed
+		other["tavern_fallback_source"] = relayInfo.TavernFallbackSource
+		other["wallet_quota_deducted"] = 0
+		if relayInfo.TavernFallbackSource == BillingSourceWallet {
+			other["wallet_quota_deducted"] = relayInfo.TavernPaidConsumed
+		}
+	}
+	if relayInfo.BillingSource == BillingSourceImageStudio {
+		other["studio_gift_consumed"] = relayInfo.ImageStudioGiftConsumed
+		other["studio_paid_consumed"] = relayInfo.ImageStudioPaidConsumed
+		other["studio_fallback_source"] = relayInfo.ImageStudioFallbackSource
+		other["wallet_quota_deducted"] = 0
+		if relayInfo.ImageStudioFallbackSource == BillingSourceWallet {
+			other["wallet_quota_deducted"] = relayInfo.ImageStudioPaidConsumed
+		}
+	}
+	if relayInfo.BillingSource == BillingSourceSubscription || relayInfo.TavernFallbackSource == BillingSourceSubscription ||
+		relayInfo.ImageStudioFallbackSource == BillingSourceSubscription {
 		if relayInfo.SubscriptionId != 0 {
 			other["subscription_id"] = relayInfo.SubscriptionId
 		}

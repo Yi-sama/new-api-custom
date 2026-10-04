@@ -566,6 +566,45 @@ test('image preference failures do not claim persistence and writes stay ordered
   assert.equal(switched.imageState.imagePreferences().size, '1:1')
 })
 
+test('chat model selection saves account defaults without saving empty selections', async (t) => {
+  const fixture = await setup(t, false, false, true)
+  fixture.dom.window.localStorage.token = 'chat-user-token'
+  fixture.settings.set({ newApiImageModel: 'image-model', newApiImageSize: '4:3' })
+  await fixture.imageState.saveChatModels(['chat-model'])
+  const request = fixture.requests.at(-1)
+  assert.deepEqual(JSON.parse(request.options.body), { ui: { models: ['chat-model'] } })
+  assert.equal(fixture.imageState.imagePreferences().model, 'image-model')
+  const reloaded = await setup(t, false, false, true)
+  reloaded.settings.set(JSON.parse(request.options.body).ui)
+  let saved
+  reloaded.settings.subscribe((value) => { saved = value })()
+  assert.deepEqual(Array.from(saved.models), ['chat-model'])
+  for (const value of [[], [''], ['chat-model', '']]) await fixture.imageState.saveChatModels(value)
+  assert.equal(fixture.requests.length, 1)
+
+  const source = execFileSync('python', ['-B', '-c',
+    'import sys; from pathlib import Path; sys.stdout.reconfigure(encoding="utf-8"); sys.path.insert(0, sys.argv[1]); from patch_frontend import patch_chat; print(patch_chat(Path(sys.argv[2]).read_text(encoding="utf-8")))',
+    __dirname, join(chunks, 'weExeAJk.js')], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 })
+  const start = source.indexOf('set values(P){g(P);NewApiSaveChatModels')
+  assert.ok(start >= 0)
+  const end = source.indexOf('},$$legacy', start)
+  let selected
+  const errors = []
+  const callback = vm.runInNewContext(`({${source.slice(start, end + 1)}})`, {
+    g: (value) => { selected = value },
+    NewApiSaveChatModels: fixture.imageState.saveChatModels,
+    _t: { error: (value) => errors.push(value) }, s: () => ({ t: (value) => value }),
+  })
+  callback.values = ['other-model']
+  await fixture.tick()
+  assert.deepEqual(Array.from(selected), ['other-model'])
+  assert.deepEqual(JSON.parse(fixture.requests.at(-1).options.body), { ui: { models: ['other-model'] } })
+  fixture.dom.window.fetch = async () => ({ ok: false })
+  callback.values = ['rejected-model']
+  await fixture.tick()
+  assert.deepEqual(errors, ['Failed to save model preferences'])
+})
+
 test('actual admin save persists the image group without requiring a shared key and notifies only on success', async () => {
   const source = execFileSync('python', ['-B', '-c',
     'import sys; from pathlib import Path; sys.stdout.reconfigure(encoding="utf-8"); sys.path.insert(0, sys.argv[1]); from patch_frontend import patch_image_settings; print(patch_image_settings(Path(sys.argv[2]).read_text(encoding="utf-8")))',

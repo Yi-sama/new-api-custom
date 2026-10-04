@@ -23,6 +23,7 @@ async function setup(t, initial = {}) {
     intervals: [],
     resets: 0,
     synced: [],
+    giftChecks: 0,
     imageGroup: '',
     imageModels: [],
     imageError: '',
@@ -44,6 +45,7 @@ async function setup(t, initial = {}) {
     setGroupPicker: (value) => { state.picker = value },
     readImageStudio: async () => state.pendingImages || { group: state.imageGroup, models: state.imageModels, error: state.imageError },
     setImageStudio: (value) => { state.imageStudio = value },
+    showStudioGiftWelcome: async () => { state.giftChecks++ },
   }
   const window = {
     location,
@@ -90,6 +92,7 @@ test('first native request and picker store use the current account and authoriz
   assert.equal(state.picker.value, 'default')
   assert.equal(state.picker.items[0].label, 'default (Default)')
   assert.equal(state.picker.disabled, false)
+  assert.equal(state.giftChecks, 0)
   assert.equal(dom.window.document.querySelector('nav').children.length, 1)
   assert.ok(dom.window.document.querySelector('#schedule'))
   await window.fetch('https://example.com/api/models')
@@ -310,12 +313,25 @@ test('native user store uses canonical name without merging different identities
   const pickerDependency = new vm.SyntheticModule(['groupPicker'], function () {
     this.setExport('groupPicker', { set: () => {} })
   }, { context })
-  const imageDependency = new vm.SyntheticModule(['imageStudio'], function () {
+  const imageDependency = new vm.SyntheticModule(['imageStudio', 'saveStudioGiftNotice'], function () {
     this.setExport('imageStudio', { set: () => {} })
+    this.setExport('saveStudioGiftNotice', () => {})
+  }, { context })
+  const runtimeDependency = new vm.SyntheticModule(['b5'], function () {
+    this.setExport('b5', () => value)
+  }, { context })
+  const settingsDependency = new vm.SyntheticModule(['a'], function () {
+    this.setExport('a', async () => ({}))
+  }, { context })
+  const toastDependency = new vm.SyntheticModule(['t'], function () {
+    this.setExport('t', { success: () => {} })
   }, { context })
   const module = new vm.SourceTextModule(readFileSync(join(__dirname, 'studio-native.js'), 'utf8'), { context })
   await module.link((specifier) => specifier.includes('studio-group-picker') ? pickerDependency :
-    specifier.includes('studio-image-state') ? imageDependency : dependency)
+    specifier.includes('studio-image-state') ? imageDependency :
+    specifier.includes('DtFjAPax') ? runtimeDependency :
+    specifier.includes('pO6SMLjE') ? settingsDependency :
+    specifier.includes('B4BhJv0K') ? toastDependency : dependency)
   await module.evaluate()
   let mismatched = false
   module.namespace.watchUser({ email: 'alice@example.com', username: 'Alice' }, () => { mismatched = true })

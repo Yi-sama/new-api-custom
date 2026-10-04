@@ -50,6 +50,11 @@ const bobSession: VideoStudioSession = {
   token: 'bob-token',
   expires_at: 1_800_000_100,
 }
+const renewedAliceSession: VideoStudioSession = {
+  ...aliceSession,
+  token: 'alice-renewed-token',
+  expires_at: 1_800_000_100,
+}
 
 function setUser(id: number, username: string) {
   useAuthStore.getState().auth.setUser({ id, username, role: 1 })
@@ -168,6 +173,114 @@ describe('Video Studio session handoff', () => {
     })
     expect(postMessage).toHaveBeenCalledWith(
       { type: 'new-api-video-session', session: aliceSession },
+      window.location.origin
+    )
+  })
+
+  it('renews only a trusted iframe session without remounting the canvas', async () => {
+    postSession
+      .mockResolvedValueOnce({ data: { success: true, data: aliceSession } })
+      .mockResolvedValueOnce({
+        data: { success: true, data: renewedAliceSession },
+      })
+    renderStudio()
+    const frame = (await screen.findByTitle(
+      'Video Studio'
+    )) as HTMLIFrameElement
+    const frameWindow = getFrameWindow(frame)
+    const postMessage = vi.spyOn(frameWindow, 'postMessage')
+
+    sendMessage({} as Window, window.location.origin, {
+      type: 'new-api-video-renew-session',
+    })
+    expect(postSession).toHaveBeenCalledTimes(1)
+
+    sendMessage(frameWindow, window.location.origin, {
+      type: 'new-api-video-renew-session',
+    })
+
+    await waitFor(() => expect(postSession).toHaveBeenCalledTimes(2))
+    expect(screen.getByTitle('Video Studio')).toBe(frame)
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'new-api-video-session', session: renewedAliceSession },
+      window.location.origin
+    )
+  })
+
+  it('returns an actionable session error when host authentication cannot renew', async () => {
+    postSession
+      .mockResolvedValueOnce({ data: { success: true, data: aliceSession } })
+      .mockRejectedValueOnce(new Error('revoked'))
+    renderStudio()
+    const frame = (await screen.findByTitle(
+      'Video Studio'
+    )) as HTMLIFrameElement
+    const postMessage = vi.spyOn(getFrameWindow(frame), 'postMessage')
+
+    sendMessage(getFrameWindow(frame), window.location.origin, {
+      type: 'new-api-video-renew-session',
+    })
+
+    await waitFor(() => expect(postSession).toHaveBeenCalledTimes(2))
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: 'new-api-video-session-error',
+        message: 'Unable to renew Video Studio. Please sign in again.',
+      },
+      window.location.origin
+    )
+  })
+
+  it.each([null, { id: 1, username: '', role: 1 }])(
+    'answers renewal with an auth error when the current host identity is missing (%j)',
+    async (hostUser) => {
+      postSession.mockResolvedValue({
+        data: { success: true, data: aliceSession },
+      })
+      renderStudio()
+      const frame = (await screen.findByTitle(
+        'Video Studio'
+      )) as HTMLIFrameElement
+      const frameWindow = getFrameWindow(frame)
+      const postMessage = vi.spyOn(frameWindow, 'postMessage')
+
+      act(() => {
+        useAuthStore.getState().auth.setUser(hostUser)
+        sendMessage(frameWindow, window.location.origin, {
+          type: 'new-api-video-renew-session',
+        })
+        expect(postMessage).toHaveBeenCalledWith(
+          {
+            type: 'new-api-video-session-error',
+            message: 'Unable to renew Video Studio. Please sign in again.',
+          },
+          window.location.origin
+        )
+        expect(postSession).toHaveBeenCalledTimes(1)
+      })
+    }
+  )
+
+  it('rejects a renewed session for a different current user', async () => {
+    postSession
+      .mockResolvedValueOnce({ data: { success: true, data: aliceSession } })
+      .mockResolvedValueOnce({ data: { success: true, data: bobSession } })
+    renderStudio()
+    const frame = (await screen.findByTitle(
+      'Video Studio'
+    )) as HTMLIFrameElement
+    const postMessage = vi.spyOn(getFrameWindow(frame), 'postMessage')
+
+    sendMessage(getFrameWindow(frame), window.location.origin, {
+      type: 'new-api-video-renew-session',
+    })
+
+    await waitFor(() => expect(postSession).toHaveBeenCalledTimes(2))
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: 'new-api-video-session-error',
+        message: 'Unable to renew Video Studio. Please sign in again.',
+      },
       window.location.origin
     )
   })

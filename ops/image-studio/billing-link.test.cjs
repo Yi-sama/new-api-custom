@@ -21,7 +21,10 @@ const markup = `
     <div data-id="workspace"><a id="sidebar-workspace-button" href="/workspace">工作空间</a></div>
     <!-- Svelte navigation boundary -->
     <div><a href="/notes">笔记</a></div>
-  </div></aside>
+  </div><div id="account-row"><button id="account-menu" class="flex items-center w-full">
+    <div><img src="/api/v1/users/fixture/profile/image"></div>
+    <div class="self-center font-normal truncate">yisama</div>
+  </button></div></aside>
   <nav class="sticky top-0">
     <div id="navbar-bg-gradient-to-b"></div>
     <div class="lg:mr-1 flex flex-none items-center gap-2 self-center" id="actions">
@@ -36,6 +39,7 @@ const markup = `
 const billing = {
   remaining_quota: 1_000_000,
   used_quota: 250_000,
+  studio_gift_quota: 500_000,
   display_type: 'USD',
   quota_per_unit: 500_000,
 }
@@ -43,11 +47,12 @@ const flush = () => new Promise(setImmediate)
 
 async function loadControls(
   t,
-  { html = markup, ok = true, usage = { user_count: 1 }, usageOk = true, url = 'http://localhost:3002/' } = {}
+  { html = markup, ok = true, usage = { user_count: 1 }, usageOk = true, url = 'http://localhost:3002/', billingData = billing } = {}
 ) {
   const dom = new JSDOM(`<!doctype html><body>${html}</body>`, {
     url,
     runScripts: 'outside-only',
+    pretendToBeVisual: true,
   })
   const observers = []
   const NativeObserver = dom.window.MutationObserver
@@ -74,7 +79,7 @@ async function loadControls(
       return { ok: usageOk, json: async () => usage }
     }
     assert.equal(path, '/api/image-studio/billing')
-    return { ok, json: async () => billing }
+    return { ok, json: async () => billingData }
   }
   const context = dom.getInternalVMContext()
   const modules = new Map()
@@ -129,10 +134,13 @@ test('mounts above New Chat and before the native tooltip-wrapped actions', asyn
   assertPlacement(document)
   assert.equal(
     document.getElementById('new-api-billing-summary').textContent,
-    '余额：$2.00 · 已用：$0.50'
+    '余额：$2.00 · 赠送余额：$1.00 · 已用：$0.50'
   )
-  assert.equal(requests[0].path, '/api/image-studio/billing')
-  assert.equal(requests[0].options.credentials, 'same-origin')
+  const billingRequest = requests.find(({ path }) => path === '/api/image-studio/billing')
+  assert.equal(billingRequest.options.credentials, 'same-origin')
+  assert.equal(billingRequest.options.cache, 'no-store')
+  assert.equal(document.getElementById('new-api-account-balance').textContent, '$2.00')
+  assert.equal(document.getElementById('new-api-account-balance').parentElement.id, 'account-menu')
   assert.equal(document.getElementById('new-api-online-count').textContent, '在线：1')
   const usageRequest = requests.find(({ path }) => path === '/api/usage')
   assert.equal(usageRequest.options.credentials, 'same-origin')
@@ -160,8 +168,9 @@ test('billing failure keeps both controls and displays an unavailable balance', 
   assertPlacement(document)
   assert.equal(
     document.getElementById('new-api-billing-summary').textContent,
-    '余额：暂不可用'
+    '余额：暂不可用 · 赠送余额：暂不可用'
   )
+  assert.equal(document.getElementById('new-api-account-balance').textContent, '--')
   assert.equal(document.getElementById('new-api-online-count').textContent, '在线：1')
 })
 
@@ -178,6 +187,22 @@ test('mounts after hydration and restores controls after navigation without dupl
   document.body.append(document.createComment('unrelated page update'))
   await flush()
   assertPlacement(document)
+})
+
+test('keeps the balance when navigation replaces two actions with one chat settings button', async (t) => {
+  const { document } = await loadControls(t)
+  document.querySelector('nav').remove()
+  document.body.insertAdjacentHTML('beforeend', `
+    <nav class="sticky top-0">
+      <div id="navbar-bg-gradient-to-b"></div>
+      <div class="flex flex-none items-center self-center" id="actions">
+        <div class="flex" id="first-action"><button>Controls</button></div>
+      </div>
+    </nav>
+  `)
+  await flush()
+  assertPlacement(document)
+  assert.equal(document.getElementById('new-api-billing-summary').textContent, '余额：$2.00 · 赠送余额：$1.00 · 已用：$0.50')
 })
 
 test('refreshes the native active count every 30 seconds, including zero', async (t) => {
@@ -199,7 +224,7 @@ test('usage access failure leaves the real balance visible without inventing an 
   const { document } = await loadControls(t, { usageOk: false })
   assert.equal(
     document.getElementById('new-api-billing-summary').textContent,
-    '余额：$2.00 · 已用：$0.50'
+    '余额：$2.00 · 赠送余额：$1.00 · 已用：$0.50'
   )
   const online = document.getElementById('new-api-online-count')
   assert.equal(online.textContent, '在线：暂不可用')
@@ -223,6 +248,49 @@ test('invalid or missing counts are unavailable and recover on the next refresh'
   await flush()
   assert.equal(online.textContent, '在线：3')
   assert.equal(online.dataset.state, 'ready')
+})
+
+test('restricted Studio gift is separate from the wallet and remains visible at zero', async (t) => {
+  const billingData = { ...billing, studio_gift_quota: 500_000 }
+  const { document, intervals } = await loadControls(t, { billingData })
+  const summary = document.getElementById('new-api-billing-summary')
+  assert.equal(summary.textContent, '余额：$2.00 · 赠送余额：$1.00 · 已用：$0.50')
+  billingData.studio_gift_quota = 0
+  intervals.find(({ delay }) => delay === 5000).callback()
+  await flush()
+  assert.equal(summary.textContent, '余额：$2.00 · 赠送余额：$0.00 · 已用：$0.50')
+})
+
+test('missing gift data stays visible as unavailable without inventing credit', async (t) => {
+  const { document } = await loadControls(t, { billingData: { ...billing, studio_gift_quota: undefined } })
+  assert.equal(document.getElementById('new-api-billing-summary').textContent,
+    '余额：$2.00 · 赠送余额：暂不可用 · 已用：$0.50')
+})
+
+test('account and header balances update together and remounted accounts reuse the latest amount', async (t) => {
+  const billingData = { ...billing }
+  const { document, intervals, requests } = await loadControls(t, { billingData })
+  billingData.remaining_quota = 750_000
+  billingData.studio_gift_quota = 100_000
+  intervals.find(({ delay }) => delay === 5000).callback()
+  await flush()
+  assert.equal(document.getElementById('new-api-account-balance').textContent, '$1.50')
+  assert.equal(document.getElementById('new-api-billing-summary').textContent,
+    '余额：$1.50 · 赠送余额：$0.20 · 已用：$0.50')
+  const count = requests.length
+  document.getElementById('account-row').remove()
+  document.querySelector('aside').insertAdjacentHTML('beforeend',
+    '<div id="account-row"><button id="account-menu"><img src="/api/v1/users/fixture/profile/image"><div class="font-normal truncate">yisama</div></button></div>')
+  await flush()
+  assert.equal(document.getElementById('new-api-account-balance').textContent, '$1.50')
+  assert.equal(requests.length, count)
+  assert.equal(document.querySelectorAll('#new-api-account-balance').length, 1)
+})
+
+test('account balance remains available when no top navigation is mounted', async (t) => {
+  const { document } = await loadControls(t, { html: markup.replace(/<nav[\s\S]*?<\/nav>/, '') })
+  assert.equal(document.getElementById('new-api-billing-badge'), null)
+  assert.equal(document.getElementById('new-api-account-balance').textContent, '$2.00')
 })
 
 test('opening and recreating the mobile sidebar restores the entry without duplicates', async (t) => {

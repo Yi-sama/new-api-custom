@@ -45,7 +45,9 @@ export async function createVideoStudioSession(): Promise<VideoStudioSession> {
     typeof session.username !== 'string' ||
     typeof session.token !== 'string' ||
     !session.token ||
-    typeof session.expires_at !== 'number'
+    typeof session.expires_at !== 'number' ||
+    !Number.isFinite(session.expires_at) ||
+    session.expires_at <= Date.now() / 1000
   ) {
     throw new Error(response.data.message || 'Invalid Video Studio session')
   }

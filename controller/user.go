@@ -659,6 +659,12 @@ func GetUserModels(c *gin.Context) {
 	models := service.GetGroupsEnabledModels(groupsToQuery)
 	if strings.EqualFold(c.Query("modality"), "image") {
 		models = service.GetGroupsEnabledImageModels(groupsToQuery)
+	} else if strings.EqualFold(c.Query("modality"), "chat") {
+		models, err = service.GetGroupsEnabledChatModels(groupsToQuery)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

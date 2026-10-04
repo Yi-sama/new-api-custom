@@ -1,0 +1,14 @@
+{
+  "services": {
+    "risuai": {
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/opt/us-whitelist/releases/production-suite-20261003-001/https-fix/runtime/server.cjs",
+          "target": "/app/server.cjs",
+          "read_only": true
+        }
+      ]
+    }
+  }
+}

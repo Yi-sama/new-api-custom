@@ -77,7 +77,23 @@ func SettleBilling(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, actualQuo
 
 		// 发送额度通知（订阅计费使用订阅剩余额度）
 		if actualQuota != 0 {
-			if relayInfo.BillingSource == BillingSourceSubscription {
+			if relayInfo.BillingSource == BillingSourceImageStudio {
+				if relayInfo.ImageStudioPaidConsumed > 0 {
+					if relayInfo.ImageStudioFallbackSource == BillingSourceSubscription {
+						checkAndSendSubscriptionQuotaNotify(relayInfo)
+					} else {
+						checkAndSendQuotaNotify(relayInfo, relayInfo.ImageStudioPaidConsumed, 0)
+					}
+				}
+			} else if relayInfo.BillingSource == BillingSourceTavern {
+				if relayInfo.TavernPaidConsumed > 0 {
+					if relayInfo.TavernFallbackSource == BillingSourceSubscription {
+						checkAndSendSubscriptionQuotaNotify(relayInfo)
+					} else {
+						checkAndSendQuotaNotify(relayInfo, relayInfo.TavernPaidConsumed, 0)
+					}
+				}
+			} else if relayInfo.BillingSource == BillingSourceSubscription {
 				checkAndSendSubscriptionQuotaNotify(relayInfo)
 			} else {
 				checkAndSendQuotaNotify(relayInfo, actualQuota-preConsumed, preConsumed)

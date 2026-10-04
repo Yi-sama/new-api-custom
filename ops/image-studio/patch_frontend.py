@@ -29,6 +29,19 @@ def patch_model_selector(source):
     )
 
 
+def patch_chat_preferences(source):
+    source = replace_once(
+        source, 'var um=Object.defineProperty;',
+        'import {saveChatModels as NewApiSaveChatModels} from "/static/studio-image-state.js?v=23";'
+        'var um=Object.defineProperty;',
+    )
+    return replace_once(
+        source, 'get values(){return g()},set values(P){g(P)}',
+        'get values(){return g()},set values(P){g(P);'
+        'NewApiSaveChatModels(P).catch(()=>_t.error(s().t("Failed to save model preferences")))}',
+    )
+
+
 def patch_chat(source):
     source = replace_once(
         source, 'import"./CWj6FrbW.js";',
@@ -108,7 +121,7 @@ def patch_chat(source):
         'c(Kt,!0),newApiImagePreference=NewApiImagePreferences(n()),'
         'c(newApiImageSize,newApiImagePreference.size),c(newApiImageModel,newApiImagePreference.model)',
     )
-    return source
+    return patch_chat_preferences(source)
 
 
 def patch_image_settings(source):
@@ -157,6 +170,8 @@ def patch_tool_results(source):
 
 def version_static_assets(build):
     static = build / "static"
+    custom = build / "studio-v29/custom"
+    custom.mkdir(parents=True, exist_ok=True)
     for name in (
         "billing-link.js",
         "studio-group-picker.js",
@@ -166,25 +181,76 @@ def version_static_assets(build):
         "studio-image-state.js",
         "studio-link.js",
         "studio-native.js",
+        "studio-tool-result.js",
     ):
         path = static / name
         source = path.read_text(encoding="utf-8")
-        source = source.replace("/studio-v21/", "/studio-v23/").replace("?v=21", "?v=23")
+        for previous in (21, 23, 25, 26, 27):
+            source = source.replace(f"/studio-v{previous}/", "/studio-v29/").replace(
+                f"?v={previous}", "?v=29"
+            )
+        source = source.replace("/static/studio-", "/studio-v29/custom/studio-")
         path.write_text(source, encoding="utf-8")
+        (custom / name).write_text(source, encoding="utf-8")
+    shutil.copyfile(static / "billing-bar.css", custom / "billing-bar.css")
 
 
 def version_native_assets(build):
     # Keep relative module imports together so Svelte and its stores stay singletons.
     native = build / "_app/immutable"
     for path in native.rglob("*.js"):
-        if "/_app/immutable/" in path.read_text(encoding="utf-8"):
+        source = path.read_text(encoding="utf-8")
+        if "/_app/immutable/" in source:
             raise RuntimeError(f"Unexpected absolute native module reference: {path}")
-    shutil.copytree(native, build / "studio-v23")
+        path.write_text(
+            source.replace("?v=23", "?v=29").replace("/static/studio-", "/studio-v29/custom/studio-"),
+            encoding="utf-8",
+        )
+    shutil.copytree(native, build / "studio-v29")
     index = build / "index.html"
     source = index.read_text(encoding="utf-8")
     if "/_app/immutable/" not in source:
         raise RuntimeError("Missing native frontend entry references")
-    index.write_text(source.replace("/_app/immutable/", "/studio-v23/"), encoding="utf-8")
+    index.write_text(source.replace("/_app/immutable/", "/studio-v29/"), encoding="utf-8")
+
+
+def upgrade_frontend(build, sources):
+    """Upgrade pinned v23-v27 assets without rebuilding the Open WebUI backend."""
+    index = build / "index.html"
+    source = index.read_text(encoding="utf-8")
+    previous = next((version for version in (27, 26, 25, 23) if f"/studio-v{version}/" in source), None)
+    if previous is None:
+        raise RuntimeError("Expected the deployed v23, v25, v26 or v27 frontend")
+    native = build / f"studio-v{previous}"
+    chat = native / "chunks/weExeAJk.js"
+    chat_source = chat.read_text(encoding="utf-8")
+    patched_chat = patch_chat_preferences(chat_source) if previous == 23 else chat_source
+    target = build / "studio-v29"
+    if target.exists():
+        raise RuntimeError("The v29 asset directory already exists")
+    shutil.copytree(native, target)
+    (target / "chunks/weExeAJk.js").write_text(patched_chat, encoding="utf-8")
+    for path in target.rglob("*.js"):
+        source = path.read_text(encoding="utf-8")
+        path.write_text(
+            source.replace(f"/studio-v{previous}/", "/studio-v29/").replace(
+                f"?v={previous}", "?v=29"
+            ).replace("/static/studio-", "/studio-v29/custom/studio-"),
+            encoding="utf-8",
+        )
+    for path in sources.glob("*.js"):
+        if path.name != "billing-link.js" and not path.name.startswith("studio-"):
+            continue
+        shutil.copyfile(path, build / "static" / path.name)
+    shutil.copyfile(sources / "billing-bar.css", build / "static/billing-bar.css")
+    version_static_assets(build)
+    source = index.read_text(encoding="utf-8")
+    source = source.replace(f"/studio-v{previous}/", "/studio-v29/").replace(
+        f"?v={previous}", "?v=29"
+    ).replace("?v=24", "?v=29")
+    for name in ("billing-link.js", "billing-bar.css", "studio-link.js"):
+        source = source.replace(f"/static/{name}", f"/studio-v29/custom/{name}")
+    index.write_text(source, encoding="utf-8")
 
 
 def patch(build):
@@ -219,8 +285,8 @@ def patch(build):
     selector.write_text(patch_model_selector(selector.read_text(encoding="utf-8")), encoding="utf-8")
     tool_results = build / "_app/immutable/chunks/Cizwf2GR.js"
     tool_results.write_text(patch_tool_results(tool_results.read_text(encoding="utf-8")), encoding="utf-8")
-    version_static_assets(build)
     version_native_assets(build)
+    version_static_assets(build)
 
 
 if __name__ == "__main__":

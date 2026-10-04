@@ -95,6 +95,7 @@ func ImageStudioBridgeAuth() gin.HandlerFunc {
 		common.SetContextKey(c, constant.ContextKeyUsingGroup, group)
 		common.SetContextKey(c, constant.ContextKeyTokenGroup, group)
 		c.Set(imageStudioBridgeUserKey, imageStudioBridgeUser{user: user, role: role, identity: expectedIdentity})
+		c.Set("image_studio_authenticated", true)
 		c.Next()
 	}
 }
@@ -131,6 +132,10 @@ func GetImageStudioContext(c *gin.Context) {
 	session, ok := bridgeUser.(imageStudioBridgeUser)
 	if !ok || session.user == nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	if _, _, err := model.ClaimImageStudioCredit(session.user.Id); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
