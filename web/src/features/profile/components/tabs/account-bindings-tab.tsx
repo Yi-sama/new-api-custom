@@ -55,6 +55,7 @@ import type { UserProfile, BindingItem } from '../../types'
 import { EmailBindDialog } from '../dialogs/email-bind-dialog'
 import { TelegramBindDialog } from '../dialogs/telegram-bind-dialog'
 import { WeChatBindDialog } from '../dialogs/wechat-bind-dialog'
+import { QQBinding } from '../qq-binding'
 
 // ============================================================================
 // Account Bindings Tab Component
@@ -419,6 +420,7 @@ export function AccountBindingsTab({
 
   return (
     <>
+      <QQBinding userId={profile.id} onUpdate={onUpdate} />
       <div className='grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3'>
         {bindings.map((binding) => {
           let actionLabel = t('Bind')

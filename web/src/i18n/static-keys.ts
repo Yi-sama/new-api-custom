@@ -664,6 +664,8 @@ export const STATIC_I18N_KEYS = [
   'Choose channels',
   'Clear channel selection',
   'Complete',
+  'Sub2API native summaries',
+  'Includes non-Sub upstream calls',
   'Enter the amount you paid in RMB once per purchase.',
   'Incomplete request matches',
   'Loading profitability report',

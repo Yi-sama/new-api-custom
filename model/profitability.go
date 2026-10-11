@@ -24,6 +24,7 @@ type ProfitabilityReportOptions struct {
 	RevenueBasis            string
 	ChannelIDs              []int
 	ChannelSelectionPresent bool
+	UseSubSummary           bool
 }
 
 type ProfitabilityAvailableChannel struct {
@@ -119,6 +120,8 @@ type ProfitabilityGroup struct {
 }
 
 type ProfitabilityChannel struct {
+	SubUsageStatus     string   `json:"sub_usage_status,omitempty"`
+	RequestCount       int64    `json:"request_count"`
 	Id                 int      `json:"id"`
 	Name               string   `json:"name"`
 	PurchaseRmb        float64  `json:"purchase_rmb"`
@@ -165,6 +168,7 @@ type ProfitabilityPoolSummary struct {
 }
 
 type ProfitabilityReport struct {
+	SubUsageSource       string                          `json:"sub_usage_source"`
 	Pool                 ProfitabilityPoolSummary        `json:"pool"`
 	RevenueUsd           float64                         `json:"revenue_usd"`
 	TopupRevenueUsd      float64                         `json:"topup_revenue_usd"`
@@ -702,7 +706,34 @@ func addProfitabilityBreakdown(report *ProfitabilityReport, entries []*Profitabi
 		row.PurchaseRecorded = true
 	}
 
-	subLogs, status, subError := GetSub2APIUsageLogs(startTimestamp, endTimestamp)
+	var subLogs []sub2APIUsageLog
+	var summary sub2APIUsageSummary
+	var status, subError string
+	if options.UseSubSummary {
+		report.SubUsageSource = "summary"
+		var channels []Channel
+		if err := DB.Select("id", "key", "base_url").Find(&channels).Error; err != nil {
+			return err
+		}
+		selectedChannels := make([]Channel, 0, len(channels))
+		for _, channel := range channels {
+			if channelSelected(channel.Id) {
+				selectedChannels = append(selectedChannels, channel)
+			}
+		}
+		summary, status, subError = getSub2APIUsageSummary(startTimestamp, endTimestamp, selectedChannels)
+		for _, row := range report.Channels {
+			row.SubUsageStatus = "unavailable"
+		}
+		for id, usage := range summary.channelUsage {
+			row := addChannel(id)
+			row.SubUsageUsd = usage
+			row.SubUsageStatus = "complete"
+		}
+	} else {
+		report.SubUsageSource = "logs"
+		subLogs, status, subError = GetSub2APIUsageLogs(startTimestamp, endTimestamp)
+	}
 	subByRequest := make(map[string]sub2APIUsageLog, len(subLogs))
 	for _, log := range subLogs {
 		if log.RequestId == "" {
@@ -725,7 +756,7 @@ func addProfitabilityBreakdown(report *ProfitabilityReport, entries []*Profitabi
 	}
 	requestCounts := make(map[string]int)
 	for _, call := range calls {
-		if (startTimestamp == 0 || call.CreatedAt >= startTimestamp) && call.UpstreamRequestId != "" {
+		if !options.UseSubSummary && (startTimestamp == 0 || call.CreatedAt >= startTimestamp) && call.UpstreamRequestId != "" {
 			requestCounts[call.UpstreamRequestId]++
 			if requestCounts[call.UpstreamRequestId] > 1 {
 				status, subError = "error", "duplicate New API upstream request IDs"
@@ -798,6 +829,7 @@ func addProfitabilityBreakdown(report *ProfitabilityReport, entries []*Profitabi
 		}
 
 		row := addChannel(call.ChannelId)
+		row.RequestCount++
 		report.CallChargeRmb += charge
 		row.CustomerChargeRmb += charge
 		key := fmt.Sprintf("%d:%s", call.ChannelId, call.ModelName)
@@ -831,8 +863,10 @@ func addProfitabilityBreakdown(report *ProfitabilityReport, entries []*Profitabi
 			totals.customers.add(&call, charge, cost, matched)
 		}
 		if !matched {
-			row.UnmatchedRequests++
-			report.UnmatchedRequests++
+			if !options.UseSubSummary {
+				row.UnmatchedRequests++
+				report.UnmatchedRequests++
+			}
 			continue
 		}
 
@@ -919,12 +953,14 @@ func addProfitabilityBreakdown(report *ProfitabilityReport, entries []*Profitabi
 	}
 	for _, modelRow := range report.Models {
 		channel := channelByID[modelRow.ChannelId]
-		if channel.SubUsageUsd > 0 {
-			modelRow.AllocatedCostRmb = channel.PurchaseRmb * modelRow.SubUsageUsd / channel.SubUsageUsd
-		}
-		if channel.ProfitStatus == "complete" {
-			profit := modelRow.CustomerChargeRmb - modelRow.AllocatedCostRmb
-			modelRow.EstimatedProfitRmb = &profit
+		if !options.UseSubSummary {
+			if channel.SubUsageUsd > 0 {
+				modelRow.AllocatedCostRmb = channel.PurchaseRmb * modelRow.SubUsageUsd / channel.SubUsageUsd
+			}
+			if channel.ProfitStatus == "complete" {
+				profit := modelRow.CustomerChargeRmb - modelRow.AllocatedCostRmb
+				modelRow.EstimatedProfitRmb = &profit
+			}
 		}
 	}
 	allocationStatus := report.ProfitStatus
@@ -966,6 +1002,9 @@ func addProfitabilityBreakdown(report *ProfitabilityReport, entries []*Profitabi
 	sort.Slice(report.Channels, func(i, j int) bool { return report.Channels[i].Id < report.Channels[j].Id })
 	sort.Slice(report.Models, func(i, j int) bool { return report.Models[i].CustomerChargeRmb > report.Models[j].CustomerChargeRmb })
 	report.Pool = buildProfitabilityPoolSummary(report, poolUsage, adminSubUsage, outsideSelectedSubUsage, outsideSelectedRequests)
+	if options.UseSubSummary {
+		applyProfitabilityNativeGroups(report, summary, calls, startTimestamp, channelSelected)
+	}
 	return nil
 }
 
@@ -1028,7 +1067,7 @@ func buildProfitabilityPoolSummary(report *ProfitabilityReport, poolUsage, admin
 		pool.ProfitStatus = "no_activity"
 	default:
 		for _, channel := range report.Channels {
-			if !channel.PurchaseRecorded && channel.MatchedRequests+channel.UnmatchedRequests > 0 {
+			if !channel.PurchaseRecorded && channel.RequestCount+channel.MatchedRequests+channel.UnmatchedRequests > 0 {
 				pool.ProfitStatus = "missing_purchase"
 				break
 			}
@@ -1046,7 +1085,7 @@ func buildProfitabilityPoolSummary(report *ProfitabilityReport, poolUsage, admin
 }
 
 func profitabilityChannelStatus(row *ProfitabilityChannel, subStatus string) string {
-	hasActivity := row.MatchedRequests+row.UnmatchedRequests > 0
+	hasActivity := row.RequestCount+row.MatchedRequests+row.UnmatchedRequests > 0 || row.SubUsageUsd > 0
 	if !hasActivity && !row.PurchaseRecorded {
 		return "no_activity"
 	}

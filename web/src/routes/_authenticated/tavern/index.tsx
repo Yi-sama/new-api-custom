@@ -16,16 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
 import { Tavern } from '@/features/tavern'
-import { isSidebarModuleEnabled } from '@/lib/nav-modules'
 
 export const Route = createFileRoute('/_authenticated/tavern/')({
-  beforeLoad: () => {
-    if (!isSidebarModuleEnabled('chat', 'playground')) {
-      throw redirect({ to: '/dashboard' })
-    }
-  },
   component: Tavern,
 })

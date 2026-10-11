@@ -55,6 +55,11 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/oauth/telegram/login", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.TelegramLogin)
 		apiRouter.POST("/oauth/telegram/bind/start", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.TelegramBindStart)
 		apiRouter.GET("/oauth/telegram/bind/:flow_token", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.TelegramBind)
+		qqBenefitBotRoute := apiRouter.Group("/qq-benefits/bot")
+		qqBenefitBotRoute.Use(middleware.QQBenefitBotAuth(), middleware.DisableCache())
+		qqBenefitBotRoute.POST("/start", controller.StartQQBenefit)
+		qqBenefitBotRoute.POST("/status", controller.GetQQBenefitBotStatus)
+		qqBenefitBotRoute.POST("/confirm", controller.ConfirmQQBenefit)
 		// Standard OAuth providers (GitHub, Discord, OIDC, LinuxDO) - unified route
 		apiRouter.GET("/oauth/:provider", middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.TryUserAuth(), controller.HandleOAuth)
 		apiRouter.GET("/ratio_config", middleware.CriticalRateLimit(), controller.GetRatioConfig)
@@ -91,6 +96,8 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/sessions/revoke-others", middleware.DisableCache(), controller.RevokeOtherLoginSessions)
 				selfRoute.GET("/self/groups", controller.GetUserGroups)
 				selfRoute.GET("/self", controller.GetSelf)
+				selfRoute.GET("/qq-binding", middleware.DisableCache(), controller.GetQQBenefitStatus)
+				selfRoute.POST("/qq-binding/code", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("qq-binding"), middleware.DisableCache(), controller.CreateQQBenefitCode)
 				selfRoute.GET("/models", controller.GetUserModels)
 				selfRoute.PUT("/self", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.UpdateSelf)
 				selfRoute.DELETE("/self", controller.DeleteSelf)
@@ -229,6 +236,8 @@ func SetApiRouter(router *gin.Engine) {
 			channelStatusRoute.GET("/groups", middleware.AdminAuth(), controller.GetChannelStatusGroups)
 			channelStatusRoute.GET("/overview", controller.GetChannelStatusOverview)
 		}
+		apiRouter.GET("/status-images/overview", middleware.UserAuth(), middleware.DisableCache(), controller.GetStatusImageOverview)
+		apiRouter.GET("/status-images/bot", middleware.TokenAuthReadOnly(), middleware.DisableCache(), controller.GetStatusImageOverview)
 
 		// Subscription payment callbacks (no auth)
 		apiRouter.POST("/subscription/epay/notify", anonymousRequestBodyLimit, controller.SubscriptionEpayNotify)
