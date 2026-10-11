@@ -6,4 +6,4 @@ COPY studio-link.js studio-native.js studio-group-picker.js studio-image-picker.
 COPY open_webui_bridge.py patch_open_webui.py patch_frontend.py /tmp/
 
 RUN python /tmp/patch_open_webui.py && python /tmp/patch_frontend.py
-RUN python -c "from pathlib import Path; p=Path('/app/build/index.html'); s=p.read_text(); marker='<link rel=\"stylesheet\" href=\"/studio-v29/custom/billing-bar.css?v=29\"><script src=\"/studio-v29/custom/studio-link.js?v=29\"></script><script type=\"module\" src=\"/studio-v29/custom/billing-link.js?v=29\"></script>'; p.write_text(s.replace('</head>', marker + '</head>'))"
+RUN python -c "from pathlib import Path; p=Path('/app/build/index.html'); s=p.read_text(); marker='<link rel=\"stylesheet\" href=\"/studio-v33/custom/billing-bar.css?v=33\"><script src=\"/studio-v33/custom/studio-link.js?v=33\"></script><script type=\"module\" src=\"/studio-v33/custom/billing-link.js?v=33\"></script>'; p.write_text(s.replace('</head>', marker + '</head>'))"

@@ -2,13 +2,100 @@
 
 ## Current Status
 
+- US workstation v33 deployed on 2026-10-05:
+  `/opt/image-studio/releases/20261005-chat-preferences-v33/`.
+  ELEVEN active Compose layers: retain all ten prior files, including v28
+  backend override, then append v33 frontend override. Only WebUI recreated,
+  healthy/restart 0, ID
+  `2fd1ec98a58b0d853c8078a30d5856d34cfea5351db5acfc892e62ac7053deed`.
+  Image/backend/data mounts, Nginx, account settings and all 28 other container
+  IDs are unchanged. No remote build/install/pull or paid call.
+- Chat model persistence diagnosis: production already had nonempty
+  `ui.models`. The chat GROUP was only in sessionStorage, so reopening a tab
+  chose a different group; the native picker filters saved models against
+  that group's list. Saved production model has enabled abilities only in
+  three non-default groups. Group now persists in localStorage keyed by
+  New API account ID, before the first native model request; old session
+  choices migrate. Revoked/image-only groups still fall back to authorized
+  chat groups. This survives closing/reopening in the SAME browser; group
+  storage is not cross-device synchronization. Model settings remain on the
+  server. Previously lost group choices cannot be reconstructed uniquely;
+  choose once after updating when no valid old session choice remains.
+- Pixel menu remains 21 presets plus Auto. First sizes are `1024:1024`,
+  `1536:1024`, `1024:1536`, `1536:864`, `864:1536`. Only ordering changed;
+  fixed-model restrictions, exact dimensions and legacy migration remain.
+  V33 changes only group persistence and state size order; all other native/
+  helper files are identical to v32 after namespace replacement.
+- V33 checks: frontend/native 54/54, backend size 8/8. Actual compiled picker,
+  Chat recovery effect and group loader passed synthetic Chrome refresh/
+  fresh-page recovery, account isolation, wrong-group reproduction and pixel
+  order/save at 1440x900 and 390x844. Zero browser errors. Real-account
+  acceptance remains pending; no authentic session/token was extracted.
+  Live HTTP bodies for entry/seven assets match release bytes; anonymous
+  gateway/public HTTPS checks return 401. Final RAM available 4633/7937 MiB,
+  swap used 64 MiB, disk free 3660 MiB.
+  Rollback: `sh /opt/image-studio/backups/20261005-chat-preferences-v33/rollback.sh`.
+  Frozen sources/helper/manifests/report:
+  `.local-builds/studio-chat-preferences-20261005`. Browser evidence:
+  `output/playwright/studio-preferences-20261005-{fixture,check}.cjs`.
+  Overall `partially_verified`, pending user account acceptance.
+
+- Historical US workstation PIXEL-size picker deployed on local 2026-10-05 as v32,
+  superseded by v33:
+  `/opt/image-studio/releases/20261005-pixel-sizes-v32/`. Append its
+  `frontend.override.json` after ALL nine prior active Compose files,
+  including v28 backend image fixes and v31. Ten layers are active.
+  Only Open WebUI was recreated, healthy/restart 0; its image and backend/data
+  mounts are unchanged. All 28 other container IDs and Nginx config stayed
+  unchanged. Main, profitability, Video Studio, Tavern and balances untouched.
+- User clarified that "ratios" meant resolutions like `512:512` and
+  `1024:1024`, NOT `1:1` or `16:9`. v31 was an intent mismatch and is
+  superseded by v32. Native menus now display pixel dimensions with a colon,
+  plus Auto, and have no custom input/Add action. Production aliases get 21
+  presets: squares 512/768/1024/1536/2048; landscape/portrait pairs
+  1024x768, 1152x864, 1280x720, 1536x864, 1536x1024, 1536x768,
+  1920x1080 and 2016x864. Selections still send/save canonical `WIDTHxHEIGHT`.
+  Exact `gpt-image-2` gets 17 choices: existing bridge rejects 512/768 squares
+  and non-16-aligned 1080 edges. GPT Image 1 and DALL-E stay fixed-size.
+  No backend validation was relaxed to expose a requested resolution.
+  Old standard ratios migrate to their preset pixels; retired arbitrary
+  ratios such as `5:4` reset to Auto when models load. Historical
+  `newApiImageRatios` data remains inert, not deleted. Fixed-size models retain
+  their restrictions and explicit unsupported-selection warning.
+- All v32 native/custom helpers share `/studio-v32/`. 52 frontend/native
+  tests and 8 backend tests pass; all 80 offered preset/model combinations pass
+  the CURRENT production-mounted bridge policy. Custom aliases' upstream
+  support is unknown: exact pixels bypass the local unknown-ratio rejection,
+  not an upstream capability guarantee. No paid generation was performed.
+  Chrome synthetic desktop/mobile checks pass for all four production IDs,
+  512x512/1024x1024 reload, legacy `5:4` reset, model limits and text bounds.
+  Actual WebUI HTTP entry/helpers match release bytes; loopback gateway and
+  Windows public HTTPS entry/helper/billing each return anonymous 401.
+  Real-account visual/save acceptance and paid generation remain pending.
+- v32 rollback, restoring v31 without rolling back data/settings:
+  `sh /opt/image-studio/backups/20261005-pixel-sizes-v32/rollback.sh`.
+  Frozen sources, deploy helper, prepared/active manifests and final check:
+  `.local-builds/studio-pixel-sizes-20261005`. Progress/debug:
+  "US Studio Pixel Sizes (v32)", 2026-10-05.
+  Final resources: RAM 4672 MiB available of 7937, swap used 60 MiB,
+  disk free 4033 MiB. No server build/install/pull or credential extraction.
+- Historical v30 release/rollback remain intact; its user acceptance FAILED
+  and is superseded by v32. V31 sources/backups also remain intact.
+  See 2026-10-04 and 2026-10-05 progress/debug for historical evidence.
+  Concurrent blue/green main instances were observed before this task;
+  historical main deployment notes below are not a substitute for inspecting
+  its current ingress and active Compose layers before any future main update.
+  A timed-out scp export completed later with a matching checksum; tool timeout
+  is not proof of transfer termination. Reinspect file size/hash and helper
+  status before labeling an archive partial or deleting/moving it.
+
 - US production suite activated on 2026-10-04: updated profitability and full
   Video Studio are deployed at `https://api.yisama.asia`; Tavern is deployed
   with its native legal-configuration notice, NOT available for chat yet.
   User deferred terms/privacy arrangements; never set the legal flag TRUE
-  without approved documents/notices. Workstation remains its original
-  production v29 frontend plus v28 backend image fix, with all seven layers.
-  Its WebUI and gateway IDs/start times were unchanged throughout this rollout.
+  without approved documents/notices. During that suite rollout, workstation
+  stayed production v29/v28 with seven layers and unchanged WebUI/gateway IDs.
+  The later workstation-only v32 update is recorded above.
 - Main version `v1.0.0-rc.28-custom-production-suite-20261003-001`, binary
   SHA-256 `2c205bf966a6d300b8b3a4086329baa4af1f2234973974641b76c7e334d4a7db`.
   Preserve THREE main Compose layers: `/opt/us-whitelist/docker-compose.yml`,
@@ -79,11 +166,11 @@
   two layout classes fixed it, types/lint/build and red-to-green browser layout
   recheck pass. Latest candidate/backend hashes are those listed above.
 
-- US Studio account balance/gift display (2026-10-03, v29): current frontend
+- US Studio account balance/gift display (2026-10-03, v29): historical frontend
   `/opt/image-studio/releases/20261003-2325-account-balance-v29/`.
   Its `frontend.override.json` must be appended after ALL six preexisting
   Compose layers, including the v28 `backend.override.json` image fix.
-  Current container retains v28 bridge/images.py bind mounts, pinned image
+  That deployment retained v28 bridge/images.py bind mounts, pinned image
   and data volume. Main New API container/binary is unchanged.
 - Top badge explicitly says "赠送余额" alongside the separate wallet amount.
   Bottom-left named account button shows only its wallet amount on the right.
@@ -92,7 +179,7 @@
   native sidebar/header remount. Missing/error states do not invent credit.
   The user canceled the welcome toast: active code no longer reads or writes
   its acknowledgement marker. Existing markers are retained as inert data.
-- Custom scripts/CSS now live under `/studio-v29/custom/` with native modules
+- At v29, custom scripts/CSS live under `/studio-v29/custom/` with native modules
   under `/studio-v29/`, bypassing the separately served backend `/static` tree.
   HTTP body hashes are verified against mounted files, not just mount labels
   or symbol presence. Nginx `studio-yisama.conf` adds no-store for HTML through

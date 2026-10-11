@@ -30,7 +30,7 @@ type StudioJob struct {
 	Group       string          `json:"group" gorm:"type:varchar(64)"`
 	Model       string          `json:"model" gorm:"type:varchar(191)"`
 	Prompt      string          `json:"prompt" gorm:"type:text"`
-	Parameters  json.RawMessage `json:"parameters" gorm:"type:text"`
+	Parameters  json.RawMessage `json:"parameters" gorm:"type:text;serializer:json"`
 	Status      string          `json:"status" gorm:"type:varchar(16);index"`
 	CreatedAt   int64           `json:"created_at" gorm:"index:idx_studio_history"`
 	UpdatedAt   int64           `json:"updated_at"`

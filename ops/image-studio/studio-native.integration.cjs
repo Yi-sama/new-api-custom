@@ -292,80 +292,102 @@ test('revoked image selections do not silently fall back and new drafts get a de
   await unmount(instance)
 })
 
-test('image size picker uses model ratios, edits custom pixels and retains unsupported choices', async (t) => {
-  const { dom, imageStudio, open, tick, unmount, setImage, setSize, sizeProps } = await setup(t, false, false, 'size')
+test('image size picker lists pixel dimensions for production aliases without custom inputs', async (t) => {
+  const { dom, imageStudio, imageState, settings, requests, open, tick, unmount, setImage, setSize, sizeProps } = await setup(t, false, false, 'size')
+  settings.set({ newApiImageRatios: ['5:4'] })
   imageStudio.set({ group: 'images', loading: false, error: '', models: [
-    { id: 'sized', image_size_options: [{ value: '1:1', size: '1024x1024' }, { value: '4:3', size: '1152x864' }] },
-    { id: 'unknown', image_size_options: [] },
+    { id: 'gpt-image-2.5-web', image_size_options: [] },
+    { id: 'gpt-image-2.5-sunburst', image_size_options: [] },
+    { id: 'gpt-image-2.5-flare', image_size_options: [] },
+    { id: 'gpt-image-2', image_size_options: [{ value: '1:1', size: '1024x1024' }] },
   ] })
-  setImage('sized')
+  setImage('gpt-image-2.5-web')
   const instance = open()
   await tick()
   const document = dom.window.document
   const trigger = document.querySelector('.new-api-image-size-trigger')
   assert.equal(sizeProps.value, 'auto')
   assert.equal(trigger.getAttribute('aria-label'), '\u56fe\u50cf\u5c3a\u5bf8: \u81ea\u52a8')
-  trigger.click()
+  const modelIds = ['gpt-image-2.5-web', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2']
+  const labels = [
+    '1024:1024', '1536:1024', '1024:1536', '1536:864', '864:1536', '512:512', '768:768',
+    '1024:768', '768:1024', '1280:720', '720:1280', '1920:1080', '1080:1920',
+    '1152:864', '864:1152', '1536:1536', '2048:2048', '1536:768', '768:1536', '2016:864', '864:2016',
+  ]
+  for (const model of modelIds) {
+    setImage(model)
+    trigger.click()
+    await tick()
+    const buttons = [...document.querySelectorAll('.new-api-image-size-options button')]
+    const available = model === 'gpt-image-2' ?
+      labels.filter((label) => !['512:512', '768:768', '1920:1080', '1080:1920'].includes(label)) : labels
+    assert.deepEqual(buttons.map((button) => button.textContent.trim()), ['\u81ea\u52a8', ...available], model)
+    buttons.find((button) => button.textContent.trim() === '1536:864').click()
+    await tick()
+    assert.equal(sizeProps.value, '1536x864', 'presets send exact pixels accepted by the bridge, not an unknown ratio')
+    assert.equal(trigger.textContent.trim(), '1536:864')
+    assert.equal(document.querySelector('.new-api-image-size-picker').dataset.invalid, 'false')
+  }
+  assert.equal(document.querySelector('.new-api-image-size-editor'), null)
+  assert.equal(document.querySelectorAll('#model-popup input[type=number]').length, 0)
+  assert.equal(requests.length, 0, 'picker never writes arbitrary ratio lists')
+  setSize('5:4')
   await tick()
-  let buttons = document.querySelectorAll('.new-api-image-size-options button')
-  assert.deepEqual([...buttons].map((button) => button.textContent.trim()), [
-    '\u81ea\u52a8', '1:1 \u00b7 1024\u00d71024', '4:3 \u00b7 1152\u00d7864', '\u81ea\u5b9a\u4e49',
-  ])
-  buttons[2].click()
-  await tick()
-  assert.equal(sizeProps.value, '4:3')
-  setImage('unknown')
-  await tick()
-  const picker = document.querySelector('.new-api-image-size-picker')
-  assert.equal(sizeProps.value, '4:3')
-  assert.equal(picker.dataset.invalid, 'true')
-  assert.equal(document.querySelector('.new-api-image-size-error').textContent, '\u5f53\u524d\u6a21\u578b\u4e0d\u652f\u6301\u6b64\u5c3a\u5bf8')
-  trigger.click()
-  await tick()
-  buttons = document.querySelectorAll('.new-api-image-size-options button')
-  buttons[buttons.length - 1].click()
-  await tick()
-  const editor = document.querySelector('.new-api-image-size-editor')
-  const inputs = editor.querySelectorAll('input')
-  assert.equal(editor.hidden, false)
-  inputs[0].dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-  assert.equal(editor.hidden, true)
-  assert.equal(sizeProps.value, '4:3')
-  trigger.click()
-  await tick()
-  buttons = document.querySelectorAll('.new-api-image-size-options button')
-  buttons[buttons.length - 1].click()
-  inputs[0].value = '1280'
-  inputs[1].value = '720'
-  inputs[1].dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  await tick()
-  assert.equal(sizeProps.value, '1280x720')
-  assert.equal(editor.hidden, true)
-  assert.equal(picker.dataset.invalid, 'false')
-  assert.equal(trigger.textContent.trim(), '\u81ea\u5b9a\u4e49 \u00b7 1280\u00d7720')
-  trigger.click()
-  await tick()
-  buttons = document.querySelectorAll('.new-api-image-size-options button')
-  buttons[buttons.length - 1].click()
-  await tick()
-  assert.equal(editor.hidden, false, 'selecting Custom again reopens the editor')
-  inputs[0].dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  assert.equal(sizeProps.value, 'auto', 'retired ratio in a restored chat cannot be sent')
+  assert.equal(trigger.textContent.trim(), '\u81ea\u52a8')
   setSize('4:3')
-  setImage(null)
   await tick()
-  assert.equal(sizeProps.value, '4:3', 'missing model preserves the explicit size')
-  assert.equal(picker.dataset.invalid, 'true')
-  setImage('sized')
-  await tick()
-  assert.equal(sizeProps.value, '4:3')
-  assert.equal(picker.dataset.invalid, 'false')
-  setImage('unknown')
-  await tick()
-  assert.equal(sizeProps.value, '4:3', 'unsupported model preserves the explicit ratio')
-  assert.equal(picker.dataset.invalid, 'true')
+  assert.equal(sizeProps.value, '1152x864', 'old standard ratio is migrated to concrete pixels')
+  assert.equal(trigger.textContent.trim(), '1152:864')
+  const cases = modelIds.map(model => ({ model, options: imageState.imageSizeOptions({ id: model }) }))
+  const checked = execFileSync('python', ['-B', '-c',
+    'import json, sys; sys.path.insert(0, sys.argv[1]); from open_webui_bridge import bridge_image_generation_size as resolve\n' +
+    'cases = json.load(sys.stdin)\n' +
+    'for case in cases:\n' +
+    ' for option in case["options"]:\n' +
+    '  assert resolve(case["model"], {"image_generation_size": option["size"]}) == option["size"]\n' +
+    '  if ":" in option["value"]:\n' +
+    '   w, h = map(int, option["size"].split("x")); a, b = map(int, option["value"].split(":")); assert w * b == h * a\n' +
+    'print(sum(len(case["options"]) for case in cases))',
+    __dirname], { encoding: 'utf8', input: JSON.stringify(cases), timeout: 5000 })
+  assert.equal(checked.trim(), '80', 'every displayed pixel preset roundtrips through the real backend policy')
   await unmount(instance)
   assert.equal(document.querySelector('.new-api-image-size-options'), null)
   assert.equal(document.querySelector('.new-api-image-size-picker'), null)
+})
+
+test('fixed-size models preserve actual supported sizes and unsupported choices do not silently change', async (t) => {
+  const { dom, imageStudio, open, tick, unmount, setImage, setSize, sizeProps } = await setup(t, false, false, 'size')
+  imageStudio.set({ group: 'images', loading: false, error: '', models: [
+    { id: 'gpt-image-1', image_size_options: [] },
+    { id: 'dall-e-3', image_size_options: [] },
+  ] })
+  setImage('gpt-image-1')
+  const instance = open()
+  await tick()
+  const document = dom.window.document
+  const trigger = document.querySelector('.new-api-image-size-trigger')
+  trigger.click()
+  await tick()
+  let buttons = [...document.querySelectorAll('.new-api-image-size-options button')]
+  assert.deepEqual(buttons.map((button) => button.textContent.trim()), ['\u81ea\u52a8', '1024:1024', '1536:1024', '1024:1536'])
+  buttons[2].click()
+  await tick()
+  assert.equal(sizeProps.value, '1536x1024')
+  setImage('dall-e-3')
+  await tick()
+  assert.equal(sizeProps.value, '1536x1024', 'model switch cannot transform a user dimension silently')
+  assert.equal(document.querySelector('.new-api-image-size-picker').dataset.invalid, 'true')
+  trigger.click()
+  await tick()
+  buttons = [...document.querySelectorAll('.new-api-image-size-options button')]
+  buttons.find((button) => button.textContent.trim() === '1792:1024').click()
+  await tick()
+  assert.equal(sizeProps.value, '1792x1024')
+  setSize('7:4')
+  await tick()
+  assert.equal(sizeProps.value, '1792x1024')
+  await unmount(instance)
 })
 
 test('actual compiled image toggle removes picker and open menu on every disable', async (t) => {

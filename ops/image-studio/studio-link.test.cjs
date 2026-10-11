@@ -7,9 +7,11 @@ const { JSDOM } = require(require.resolve('jsdom', { paths: [join(__dirname, '..
 const source = readFileSync(join(__dirname, 'studio-link.js'), 'utf8')
 const flush = () => new Promise(setImmediate)
 async function setup(t, initial = {}) {
-  const { pageUrl = 'http://localhost:3002/', ...overrides } = initial
+  const { pageUrl = 'http://localhost:3002/', savedGroups = {}, sessionGroups = {}, ...overrides } = initial
   const dom = new JSDOM('<nav><button id="model-selector-model-button">Model</button></nav><button id="schedule">Schedule</button>', { url: pageUrl })
   t.after(() => dom.window.close())
+  for (const [key, value] of Object.entries(savedGroups)) dom.window.localStorage.setItem(key, value)
+  for (const [key, value] of Object.entries(sessionGroups)) dom.window.sessionStorage.setItem(key, value)
   const current = new URL(pageUrl)
   const state = {
     identity: { id: 4, username: 'Alice', email: 'new-api-4@studio.example.com', group: 'default' },
@@ -113,6 +115,37 @@ test('changing group resets native selection and model store before loading scop
   assert.equal(state.picker.disabled, false)
   assert.equal(state.picker.value, '\u5206\u7ec4')
   assert.equal(dom.window.sessionStorage.getItem('new-api-group:4'), '\u5206\u7ec4')
+})
+
+test('closing and reopening the workstation retains the account group needed by saved chat models', async (t) => {
+  const first = await setup(t)
+  await first.state.picker.onChange('\u5206\u7ec4')
+  const key = 'new-api-group:4'
+  assert.equal(first.dom.window.localStorage.getItem(key), '\u5206\u7ec4')
+  const reopened = await setup(t, { savedGroups: { [key]: first.dom.window.localStorage.getItem(key) } })
+  assert.equal(reopened.dom.window.sessionStorage.length, 0, 'new tab has no session preferences')
+  await reopened.window.fetch('/api/models')
+  const request = reopened.state.requests.findLast(({ path }) => path === '/api/models')
+  assert.equal(request.options.headers.get('X-NewAPI-Group'), encodeURIComponent('\u5206\u7ec4'))
+  assert.equal(reopened.state.picker.value, '\u5206\u7ec4')
+  assert.equal(reopened.state.resets, 0, 'initial recovery must not clear saved model selection')
+})
+
+test('persistent group recovery migrates session choices and never crosses accounts or permissions', async (t) => {
+  const key = 'new-api-group:4'
+  const migrated = await setup(t, { sessionGroups: { [key]: '\u5206\u7ec4' } })
+  assert.equal(migrated.state.picker.value, '\u5206\u7ec4')
+  assert.equal(migrated.dom.window.localStorage.getItem(key), '\u5206\u7ec4')
+  const freshAccount = await setup(t, { savedGroups: { 'new-api-group:5': '\u5206\u7ec4' } })
+  assert.equal(freshAccount.state.picker.value, 'default')
+  const revoked = await setup(t, { savedGroups: { [key]: '\u5206\u7ec4' }, groups: { default: {} } })
+  assert.equal(revoked.state.picker.value, 'default')
+  assert.equal(revoked.dom.window.localStorage.getItem(key), 'default')
+  const imageGroup = await setup(t, {
+    savedGroups: { [key]: 'images' }, groups: { default: {}, images: {} }, imageGroup: 'images',
+  })
+  assert.equal(imageGroup.state.picker.value, 'default')
+  assert.equal(imageGroup.dom.window.localStorage.getItem(key), 'default')
 })
 
 test('picker displays current account ratios, ranges and automatic labels without inventing values', async (t) => {

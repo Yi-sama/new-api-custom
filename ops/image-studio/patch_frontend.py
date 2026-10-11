@@ -170,7 +170,7 @@ def patch_tool_results(source):
 
 def version_static_assets(build):
     static = build / "static"
-    custom = build / "studio-v29/custom"
+    custom = build / "studio-v33/custom"
     custom.mkdir(parents=True, exist_ok=True)
     for name in (
         "billing-link.js",
@@ -185,11 +185,11 @@ def version_static_assets(build):
     ):
         path = static / name
         source = path.read_text(encoding="utf-8")
-        for previous in (21, 23, 25, 26, 27):
-            source = source.replace(f"/studio-v{previous}/", "/studio-v29/").replace(
-                f"?v={previous}", "?v=29"
+        for previous in (21, 23, 25, 26, 27, 29, 30, 31, 32):
+            source = source.replace(f"/studio-v{previous}/", "/studio-v33/").replace(
+                f"?v={previous}", "?v=33"
             )
-        source = source.replace("/static/studio-", "/studio-v29/custom/studio-")
+        source = source.replace("/static/studio-", "/studio-v33/custom/studio-")
         path.write_text(source, encoding="utf-8")
         (custom / name).write_text(source, encoding="utf-8")
     shutil.copyfile(static / "billing-bar.css", custom / "billing-bar.css")
@@ -203,39 +203,39 @@ def version_native_assets(build):
         if "/_app/immutable/" in source:
             raise RuntimeError(f"Unexpected absolute native module reference: {path}")
         path.write_text(
-            source.replace("?v=23", "?v=29").replace("/static/studio-", "/studio-v29/custom/studio-"),
+            source.replace("?v=23", "?v=33").replace("/static/studio-", "/studio-v33/custom/studio-"),
             encoding="utf-8",
         )
-    shutil.copytree(native, build / "studio-v29")
+    shutil.copytree(native, build / "studio-v33")
     index = build / "index.html"
     source = index.read_text(encoding="utf-8")
     if "/_app/immutable/" not in source:
         raise RuntimeError("Missing native frontend entry references")
-    index.write_text(source.replace("/_app/immutable/", "/studio-v29/"), encoding="utf-8")
+    index.write_text(source.replace("/_app/immutable/", "/studio-v33/"), encoding="utf-8")
 
 
 def upgrade_frontend(build, sources):
-    """Upgrade pinned v23-v27 assets without rebuilding the Open WebUI backend."""
+    """Upgrade pinned v23-v32 assets without rebuilding the Open WebUI backend."""
     index = build / "index.html"
     source = index.read_text(encoding="utf-8")
-    previous = next((version for version in (27, 26, 25, 23) if f"/studio-v{version}/" in source), None)
+    previous = next((version for version in (32, 31, 30, 29, 27, 26, 25, 23) if f"/studio-v{version}/" in source), None)
     if previous is None:
-        raise RuntimeError("Expected the deployed v23, v25, v26 or v27 frontend")
+        raise RuntimeError("Expected the deployed v23, v25, v26, v27, v29, v30, v31 or v32 frontend")
     native = build / f"studio-v{previous}"
     chat = native / "chunks/weExeAJk.js"
     chat_source = chat.read_text(encoding="utf-8")
     patched_chat = patch_chat_preferences(chat_source) if previous == 23 else chat_source
-    target = build / "studio-v29"
+    target = build / "studio-v33"
     if target.exists():
-        raise RuntimeError("The v29 asset directory already exists")
+        raise RuntimeError("The v33 asset directory already exists")
     shutil.copytree(native, target)
     (target / "chunks/weExeAJk.js").write_text(patched_chat, encoding="utf-8")
     for path in target.rglob("*.js"):
         source = path.read_text(encoding="utf-8")
         path.write_text(
-            source.replace(f"/studio-v{previous}/", "/studio-v29/").replace(
-                f"?v={previous}", "?v=29"
-            ).replace("/static/studio-", "/studio-v29/custom/studio-"),
+            source.replace(f"/studio-v{previous}/", "/studio-v33/").replace(
+                f"?v={previous}", "?v=33"
+            ).replace("/static/studio-", "/studio-v33/custom/studio-"),
             encoding="utf-8",
         )
     for path in sources.glob("*.js"):
@@ -245,11 +245,11 @@ def upgrade_frontend(build, sources):
     shutil.copyfile(sources / "billing-bar.css", build / "static/billing-bar.css")
     version_static_assets(build)
     source = index.read_text(encoding="utf-8")
-    source = source.replace(f"/studio-v{previous}/", "/studio-v29/").replace(
-        f"?v={previous}", "?v=29"
-    ).replace("?v=24", "?v=29")
+    source = source.replace(f"/studio-v{previous}/", "/studio-v33/").replace(
+        f"?v={previous}", "?v=33"
+    ).replace("?v=24", "?v=33")
     for name in ("billing-link.js", "billing-bar.css", "studio-link.js"):
-        source = source.replace(f"/static/{name}", f"/studio-v29/custom/{name}")
+        source = source.replace(f"/static/{name}", f"/studio-v33/custom/{name}")
     index.write_text(source, encoding="utf-8")
 
 

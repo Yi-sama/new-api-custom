@@ -69,11 +69,13 @@
     const result = await response.json()
     if (!result.success) throw new Error('New API groups unavailable')
     groups = Object.fromEntries(Object.entries(result.data).filter(([value]) => value !== imageGroup))
-    const saved = group || sessionStorage.getItem(`new-api-group:${context.id}`)
+    const groupKey = `new-api-group:${context.id}`
+    const saved = group || localStorage.getItem(groupKey) || sessionStorage.getItem(groupKey)
     const next = Object.hasOwn(groups, saved) ? saved :
       Object.hasOwn(groups, context.group) ? context.group : Object.keys(groups)[0] || ''
     const selectionChanged = group !== next
     group = next
+    localStorage.setItem(groupKey, group)
     syncGroupPicker()
     if (selectionChanged && native) await reloadModels()
   }
@@ -127,6 +129,7 @@
     modelError = false
     syncGroupPicker()
     sessionStorage.setItem(`new-api-group:${context.id}`, group)
+    localStorage.setItem(`new-api-group:${context.id}`, group)
     sessionStorage.removeItem('selectedModels')
     native.setModels([])
     window.dispatchEvent(new Event('new-api-group-changed'))
