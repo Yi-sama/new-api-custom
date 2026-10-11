@@ -663,6 +663,32 @@ describe('ProfitabilityCalculator', () => {
     expect(screen.queryByText('$99.00')).not.toBeInTheDocument()
   })
 
+  test('shows native Sub summaries and native request counts in the channel ledger', async () => {
+    setStoredSelection([7])
+    vi.mocked(getProfitabilitySummary).mockResolvedValue({
+      ...report,
+      sub_usage_source: 'summary',
+      channels: [
+        {
+          ...report.channels[0],
+          request_count: 3,
+          sub_usage_status: 'complete',
+        },
+      ],
+    })
+    renderCalculator()
+
+    expect(
+      await screen.findByText('Sub2API native summaries')
+    ).toBeInTheDocument()
+    const row = screen.getByRole('row', { name: /Sub channel \(#7\)/ })
+    expect(
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent)
+    ).toEqual(['Sub channel (#7)', '¥25.00', '$10.00', '3', '¥30.00'])
+  })
+
   test('shows data not ready when an older backend omits pool', async () => {
     setStoredSelection([7])
     vi.mocked(getProfitabilitySummary).mockResolvedValue({

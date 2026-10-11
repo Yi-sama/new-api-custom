@@ -230,6 +230,15 @@ func GetChannelStatusOverview(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	views, err := buildChannelStatusOverview(cfg, channels)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"enabled": cfg.Enabled, "mode": cfg.Mode, "groups": views, "checked_at": common.GetTimestamp()})
+}
+
+func buildChannelStatusOverview(cfg model.ChannelStatusConfig, channels []*model.Channel) ([]channelStatusGroupView, error) {
 	views := make([]channelStatusGroupView, 0)
 	for _, groupCfg := range cfg.Groups {
 		if !groupCfg.Enabled {
@@ -253,8 +262,7 @@ func GetChannelStatusOverview(c *gin.Context) {
 				hasChannel = true
 				channelChecks, err := loadChannelStatusChecks(channel.Id, groupCfg.Group, selectedModel, channelStatusSourceUser)
 				if err != nil {
-					common.ApiError(c, err)
-					return
+					return nil, err
 				}
 				checks = append(checks, channelChecks...)
 			}
@@ -266,8 +274,7 @@ func GetChannelStatusOverview(c *gin.Context) {
 					}
 					channelChecks, err := loadChannelStatusChecks(channel.Id, groupCfg.Group, selectedModel, channelStatusSourceAPI)
 					if err != nil {
-						common.ApiError(c, err)
-						return
+						return nil, err
 					}
 					checks = append(checks, channelChecks...)
 				}
@@ -279,7 +286,7 @@ func GetChannelStatusOverview(c *gin.Context) {
 		}
 		views = append(views, groupView)
 	}
-	common.ApiSuccess(c, gin.H{"enabled": cfg.Enabled, "mode": cfg.Mode, "groups": views, "checked_at": common.GetTimestamp()})
+	return views, nil
 }
 
 func runChannelStatusMonitor(ctx context.Context) (int, error) {

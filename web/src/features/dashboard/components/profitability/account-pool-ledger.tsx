@@ -49,6 +49,8 @@ function statusLabel(status: string, t: (key: string) => string): string {
       return t('Sub2API sync failed')
     case 'scope_mismatch':
       return t('Selected scope does not cover the full pool')
+    case 'mixed_upstream':
+      return t('Includes non-Sub upstream calls')
     case 'cash_scope':
       return t('Cash view has no pool ratio')
     case 'unverified_scope':
@@ -274,7 +276,10 @@ export function AccountPoolLedger(props: {
     props.report.channels.some(
       (channel) =>
         !channel.purchase_recorded &&
-        channel.matched_requests + channel.unmatched_requests > 0
+        (channel.request_count ?? 0) +
+          channel.matched_requests +
+          channel.unmatched_requests >
+          0
     )
   const hasRecordedPurchase = props.report.account_purchase_count > 0
   let purchaseValue = formatRmb(props.report.account_cost_rmb)
@@ -288,6 +293,7 @@ export function AccountPoolLedger(props: {
     purchaseDetail = t('Recorded purchase costs only')
   }
   const adminSubUsageKnown =
+    props.report.sub_usage_source !== 'summary' &&
     props.report.pool?.all_calls.sub_usage_usd !== null &&
     props.report.pool?.all_calls.sub_usage_usd !== undefined
 

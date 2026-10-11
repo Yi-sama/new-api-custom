@@ -578,6 +578,7 @@ function ProfitabilityCalculatorForUser({ userId }: { userId: number }) {
         !channel.purchase_recorded &&
         (channel.customer_charge_rmb > 0 ||
           channel.sub_usage_usd > 0 ||
+          (channel.request_count ?? 0) > 0 ||
           channel.matched_requests > 0 ||
           channel.unmatched_requests > 0)
     )
@@ -601,10 +602,12 @@ function ProfitabilityCalculatorForUser({ userId }: { userId: number }) {
                 })}
           </span>
           <span>
-            {t('{{matched}} matched, {{unmatched}} unmatched requests', {
-              matched: formatInteger(report.matched_requests),
-              unmatched: formatInteger(report.unmatched_requests),
-            })}
+            {report.sub_usage_source === 'summary'
+              ? t('Sub2API native summaries')
+              : t('{{matched}} matched, {{unmatched}} unmatched requests', {
+                  matched: formatInteger(report.matched_requests),
+                  unmatched: formatInteger(report.unmatched_requests),
+                })}
           </span>
           <span>{t('Sub scope: entire instance')}</span>
         </div>
@@ -665,10 +668,14 @@ function ProfitabilityCalculatorForUser({ userId }: { userId: number }) {
                         {t('Purchase cost (RMB)')}
                       </th>
                       <th className='px-4 py-2.5 text-right font-medium'>
-                        {t('Matched Sub usage (USD)')}
+                        {report.sub_usage_source === 'summary'
+                          ? t('Sub usage (USD)')
+                          : t('Matched Sub usage (USD)')}
                       </th>
                       <th className='px-4 py-2.5 text-right font-medium'>
-                        {t('Matched / unmatched')}
+                        {report.sub_usage_source === 'summary'
+                          ? t('Requests')
+                          : t('Matched / unmatched')}
                       </th>
                       <th className='px-4 py-2.5 text-right font-medium'>
                         {t('Customer call charges (RMB)')}
@@ -682,7 +689,8 @@ function ProfitabilityCalculatorForUser({ userId }: { userId: number }) {
                       const subKnown =
                         isSubSynced &&
                         status !== 'not_configured' &&
-                        status !== 'sync_error'
+                        status !== 'sync_error' &&
+                        channel.sub_usage_status !== 'unavailable'
                       return (
                         <tr key={channel.id}>
                           <td className='px-4 py-2.5 font-medium'>
@@ -706,8 +714,14 @@ function ProfitabilityCalculatorForUser({ userId }: { userId: number }) {
                             {subKnown ? formatUsd(channel.sub_usage_usd) : '-'}
                           </td>
                           <td className='px-4 py-2.5 text-right tabular-nums'>
-                            {formatInteger(channel.matched_requests)} /{' '}
-                            {formatInteger(channel.unmatched_requests)}
+                            {report.sub_usage_source === 'summary' ? (
+                              formatInteger(channel.request_count ?? 0)
+                            ) : (
+                              <>
+                                {formatInteger(channel.matched_requests)} /{' '}
+                                {formatInteger(channel.unmatched_requests)}
+                              </>
+                            )}
                           </td>
                           <td className='px-4 py-2.5 text-right tabular-nums'>
                             {formatRmb(channel.customer_charge_rmb)}

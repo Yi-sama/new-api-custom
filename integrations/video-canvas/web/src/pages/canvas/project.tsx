@@ -2032,7 +2032,7 @@ function InfiniteCanvasPage() {
     const maskEditImageNode = useCallback(
         async (node: CanvasNodeData, payload: CanvasImageMaskEditPayload) => {
             if (!node.metadata?.content) return;
-            const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1", size: node.metadata?.size || "auto", studioAspectRatio: node.metadata?.studioAspectRatio || effectiveConfig.studioAspectRatio };
+            const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1", size: node.metadata?.size ?? "auto", studioAspectRatio: node.metadata?.studioAspectRatio ?? effectiveConfig.studioAspectRatio };
             if (payload.generate && !isAiConfigReady(generationConfig, generationConfig.model)) {
                 openConfigDialog(true);
                 return;
@@ -2131,7 +2131,7 @@ function InfiniteCanvasPage() {
     const generateAngleNode = useCallback(
         async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
             if (!node.metadata?.content) return;
-            const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1", studioAspectRatio: node.metadata?.studioAspectRatio || effectiveConfig.studioAspectRatio };
+            const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1", studioAspectRatio: node.metadata?.studioAspectRatio ?? effectiveConfig.studioAspectRatio };
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                 openConfigDialog(true);
                 return;
@@ -2863,9 +2863,9 @@ function InfiniteCanvasPage() {
                           ...effectiveConfig,
                           model: savedImageMetadata.model || effectiveConfig.imageModel || effectiveConfig.model,
                           quality: savedImageMetadata.quality || effectiveConfig.quality,
-                          size: savedImageMetadata.size || effectiveConfig.size,
+                          size: savedImageMetadata.size ?? effectiveConfig.size,
                           background: savedImageMetadata.background ?? effectiveConfig.background,
-                          studioAspectRatio: savedImageMetadata.studioAspectRatio || effectiveConfig.studioAspectRatio,
+                          studioAspectRatio: savedImageMetadata.studioAspectRatio ?? effectiveConfig.studioAspectRatio,
                           count: "1",
                       }
                     : { ...buildGenerationConfig(effectiveConfig, sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" };

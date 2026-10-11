@@ -36,6 +36,12 @@ func GetProfitabilitySummary(c *gin.Context) {
 		common.ApiErrorMsg(c, err.Error())
 		return
 	}
+	source := strings.TrimSpace(c.Query("sub_usage_source"))
+	if source != "" && source != "summary" && source != "logs" {
+		common.ApiErrorMsg(c, "invalid sub_usage_source")
+		return
+	}
+	options.UseSubSummary = source != "logs"
 	report, err := model.GetProfitabilityReportWithOptions(startTimestamp, endTimestamp, options)
 	if err != nil {
 		common.ApiError(c, err)

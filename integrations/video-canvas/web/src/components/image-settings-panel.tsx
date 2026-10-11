@@ -29,9 +29,10 @@ type ImageSettingsPanelProps = {
     className?: string;
     maxCount?: number;
     quickCount?: number;
+    batchCount?: boolean;
 };
 
-export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5", maxCount = 15, quickCount = 10 }: ImageSettingsPanelProps) {
+export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5", maxCount = 15, quickCount = 10, batchCount = false }: ImageSettingsPanelProps) {
     const { t } = useTranslation();
     const [snapDimensionToStep, setSnapDimensionToStep] = useState(true);
     const quality = config.quality || "auto";
@@ -50,7 +51,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
         const height = key === "height" ? next : dimensions.height;
         onConfigChange("size", `${alignDimension(width, snapDimensionToStep)}x${alignDimension(height, snapDimensionToStep)}`);
     };
-    if (managedStudio) return <ManagedImageSettings config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
+    if (managedStudio) return <ManagedImageSettings config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} batchCount={batchCount} maxCount={maxCount} />;
 
     return (
         <ImageSettingsTheme theme={theme}>

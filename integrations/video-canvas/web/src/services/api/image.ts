@@ -1,7 +1,7 @@
 import axios from "axios";
 import { managedStudio, studioGroupHeaders, withStudioAccountRefresh } from "@/lib/new-api-studio";
 import { fetchStudioImageJobResult, submitStudioJob, type StudioJobOptions } from "./studio-jobs";
-import { getManagedStudioParameterProfile, profileOptions } from "@/lib/studio-model-parameters";
+import { managedImageParameters } from "@/lib/studio-model-parameters";
 
 import i18n from "@/i18n";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, withLocalProxy, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
@@ -872,20 +872,6 @@ export const requestEdit = withStudioAccountRefresh(async (config: AiConfig, pro
         throw new Error(readAxiosError(error, apiText("requestFailed")));
     }
 });
-
-function managedImageParameters(config: AiConfig): Record<string, string | number> {
-    const profile = getManagedStudioParameterProfile(config, "image");
-    const parameters: Record<string, string | number> = {};
-    const counts = profileOptions<number>(profile, "counts");
-    if (counts && config.count.trim()) {
-        const count = Number(config.count);
-        if (counts.includes(count)) parameters.n = count;
-    }
-    if (profileOptions<string>(profile, "sizes")?.includes(config.size)) parameters.size = config.size;
-    if (config.studioAspectRatio && profileOptions<string>(profile, "aspect_ratios")?.includes(config.studioAspectRatio)) parameters.aspect_ratio = config.studioAspectRatio;
-    if (profileOptions<string>(profile, "qualities")?.includes(config.quality)) parameters.quality = config.quality;
-    return parameters;
-}
 
 export const requestImageQuestion = withStudioAccountRefresh(async (config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions) => {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);

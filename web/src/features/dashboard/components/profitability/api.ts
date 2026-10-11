@@ -44,6 +44,8 @@ export type ProfitabilityStatus =
   | 'unmatched'
   | 'missing_purchase'
   | 'no_activity'
+  | 'mixed_upstream'
+  | 'unverified_scope'
   | 'complete'
 
 export interface ProfitabilityAvailableChannel {
@@ -75,6 +77,7 @@ export interface ProfitabilityPoolSummary {
 }
 
 export interface ProfitabilityReport {
+  sub_usage_source?: 'summary' | 'logs'
   pool?: ProfitabilityPoolSummary
   revenue_usd: number
   topup_revenue_usd: number
@@ -117,6 +120,8 @@ export interface ProfitabilityReport {
 }
 
 export interface ProfitabilityChannel {
+  request_count?: number
+  sub_usage_status?: 'complete' | 'unavailable'
   id: number
   name: string
   status: number

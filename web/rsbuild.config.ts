@@ -59,6 +59,7 @@ export default defineConfig(({ envMode }) => {
       },
     },
     resolve: {
+      symlinks: false,
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
