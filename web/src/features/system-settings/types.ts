@@ -419,6 +419,7 @@ export type OperationsSettings = {
   NikoGroupSyncConfig: string
   ChannelStatusConfig: string
   AutoModelDefaultModels: string[]
+  FastModeAllowedGroups: string[]
 }
 
 export type SecuritySettings = {

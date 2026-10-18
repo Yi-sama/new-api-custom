@@ -88,6 +88,9 @@ func validateRemixRequest(c *gin.Context) *dto.TaskError {
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.TaskError) {
+	if a.isHeyRoute() {
+		return a.validateHeyRouteRequest(c, info)
+	}
 	if info.Action == constant.TaskActionRemix {
 		return validateRemixRequest(c)
 	}
@@ -96,6 +99,13 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 
 // EstimateBilling 根据用户请求的 seconds 和 size 计算 OtherRatios。
 func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {
+	if value, ok := c.Get(heyRouteBillingKey); ok {
+		billing := value.(heyRouteBilling)
+		return map[string]float64{
+			"seconds":    float64(billing.Seconds),
+			"resolution": billing.UnitPrice / info.PriceData.ModelPrice,
+		}
+	}
 	// remix 路径的 OtherRatios 已在 ResolveOriginTask 中设置
 	if info.Action == constant.TaskActionRemix {
 		return nil
@@ -158,6 +168,14 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		var bodyMap map[string]interface{}
 		if err := common.Unmarshal(cachedBody, &bodyMap); err == nil {
 			bodyMap["model"] = info.UpstreamModelName
+			if value, ok := c.Get(heyRouteBillingKey); ok {
+				billing := value.(heyRouteBilling)
+				bodyMap["seconds"] = strconv.Itoa(billing.Seconds)
+				delete(bodyMap, "duration")
+				if billing.Resolution != "" {
+					bodyMap["resolution"] = billing.Resolution
+				}
+			}
 			if newBody, err := common.Marshal(bodyMap); err == nil {
 				return bytes.NewReader(newBody), nil
 			}
@@ -173,8 +191,16 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
 		writer.WriteField("model", info.UpstreamModelName)
+		value, heyRoute := c.Get(heyRouteBillingKey)
+		if heyRoute {
+			billing := value.(heyRouteBilling)
+			writer.WriteField("seconds", strconv.Itoa(billing.Seconds))
+			if billing.Resolution != "" {
+				writer.WriteField("resolution", billing.Resolution)
+			}
+		}
 		for key, values := range formData.Value {
-			if key == "model" {
+			if key == "model" || (heyRoute && (key == "seconds" || key == "duration" || key == "resolution")) {
 				continue
 			}
 			for _, v := range values {

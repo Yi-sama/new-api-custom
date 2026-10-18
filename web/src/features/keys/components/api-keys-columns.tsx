@@ -41,6 +41,7 @@ import { ApiKeyGroupCell } from './api-key-group-cell'
 import { ApiKeyTimestampCell } from './api-key-timestamp-cell'
 import {
   ApiKeyCell,
+  ApiKeyFastModeCell,
   IpRestrictionsCell,
   ModelLimitsCell,
   UnlimitedQuotaBadge,
@@ -65,8 +66,10 @@ function useGroupRatios(): Record<string, number | string> {
         if (typeof info.ratio === 'number' || typeof info.ratio === 'string') {
           ratios[group] = info.ratio
           if (info.ratio_min != null && info.ratio_max != null) {
-            ratios[group] = info.ratio_min === info.ratio_max
-              ? info.ratio_min : `${info.ratio_min}-${info.ratio_max}`
+            ratios[group] =
+              info.ratio_min === info.ratio_max
+                ? info.ratio_min
+                : `${info.ratio_min}-${info.ratio_max}`
           }
         }
       }
@@ -116,6 +119,12 @@ export function useApiKeysColumns(now: number): ColumnDef<ApiKey>[] {
       ),
       size: 180,
       meta: { mobileTitle: true },
+    },
+    {
+      accessorKey: 'fast_mode',
+      header: t('Fast mode'),
+      cell: ({ row }) => <ApiKeyFastModeCell apiKey={row.original} />,
+      size: 120,
     },
     {
       accessorKey: 'status',

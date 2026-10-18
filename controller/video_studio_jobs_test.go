@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -152,6 +153,68 @@ func TestVideoStudioJobSurvivesDisconnectAndBillsOnce(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, response.Code)
 }
 
+func TestVideoStudioImageEditJobPreservesReferenceAndBillsOnce(t *testing.T) {
+	router, token, userID := setupStudioJobsTest(t)
+	const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jfZkAAAAASUVORK5CYII="
+	reference, err := base64.StdEncoding.DecodeString(png)
+	require.NoError(t, err)
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		assert.Equal(t, "/v1/images/edits", r.URL.Path)
+		require.NoError(t, r.ParseMultipartForm(1<<20))
+		defer r.MultipartForm.RemoveAll()
+		assert.Equal(t, "1", r.FormValue("n"))
+		assert.Equal(t, "1024x1024", r.FormValue("size"))
+		image, _, err := r.FormFile("image")
+		require.NoError(t, err)
+		got, err := io.ReadAll(image)
+		require.NoError(t, err)
+		require.NoError(t, image.Close())
+		assert.Equal(t, reference, got)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"created":1,"data":[{"b64_json":%q}]}`, png)
+	}))
+	defer upstream.Close()
+	createStudioJobChannel(t, upstream.URL, "gpt-image-1", constant.ChannelTypeOpenAI)
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	for key, value := range map[string]string{
+		"model": "gpt-image-1", "prompt": "edit the reference", "n": "1", "size": "1024x1024",
+	} {
+		require.NoError(t, form.WriteField(key, value))
+	}
+	image, err := form.CreateFormFile("image", "reference.png")
+	require.NoError(t, err)
+	_, err = image.Write(reference)
+	require.NoError(t, err)
+	require.NoError(t, form.Close())
+	request := httptest.NewRequest(http.MethodPost, "/jobs/images/edits", &body)
+	request.Header.Set("Content-Type", form.FormDataContentType())
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Idempotency-Key", common.GetUUID())
+	receipt := httptest.NewRecorder()
+	router.ServeHTTP(receipt, request)
+	require.Equal(t, http.StatusAccepted, receipt.Code, receipt.Body.String())
+	var envelope struct{ Data model.StudioJob }
+	require.NoError(t, common.Unmarshal(receipt.Body.Bytes(), &envelope))
+	require.NoError(t, runVideoStudioJobs(context.Background(), "edit-regression"))
+	job, err := model.FindStudioJob(userID, envelope.Data.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StudioJobSucceeded, job.Status, job.Error)
+	result, err := os.ReadFile(service.VideoStudioJobPath(job.ID, "image-0"))
+	require.NoError(t, err)
+	assert.Equal(t, reference, result)
+	quota, err := model.GetUserQuota(userID, false)
+	require.NoError(t, err)
+	assert.Less(t, quota, 10_000_000)
+	require.NoError(t, runVideoStudioJobs(context.Background(), "edit-after-restart"))
+	assert.Equal(t, int32(1), calls.Load())
+	quotaAgain, err := model.GetUserQuota(userID, false)
+	require.NoError(t, err)
+	assert.Equal(t, quota, quotaAgain)
+}
+
 func TestVideoStudioJobMultipartIdempotencyAndNativeRecovery(t *testing.T) {
 	router, token, userID := setupStudioJobsTest(t)
 	var calls atomic.Int32
@@ -219,6 +282,69 @@ func TestVideoStudioJobAmbiguousSubmissionNeverRetries(t *testing.T) {
 	assert.Equal(t, model.StudioJobUncertain, persisted.Status)
 	require.NoError(t, runVideoStudioJobs(context.Background(), "second"))
 	assert.Equal(t, int32(1), calls.Load(), "configured relay retries must not replay an uncertain studio submission")
+}
+
+func TestVideoStudioImagePolicyRejectionFailsWithoutReplayOrCharge(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		code       string
+		wantStatus string
+		wantError  string
+	}{
+		{"policy rejection", http.StatusBadRequest, "content_policy_violation", model.StudioJobFailed,
+			"image generation was rejected by upstream content policy"},
+		{"moderation rejection", http.StatusBadRequest, "moderation_blocked", model.StudioJobFailed,
+			"image generation was rejected by upstream content policy"},
+		{"other bad request", http.StatusBadRequest, "unknown_upstream_error", model.StudioJobUncertain,
+			"upstream submission could not be confirmed; do not automatically resubmit"},
+		{"policy code with server error", http.StatusServiceUnavailable, "content_policy_violation", model.StudioJobUncertain,
+			"upstream submission could not be confirmed; do not automatically resubmit"},
+		{"moderation code with server error", http.StatusServiceUnavailable, "moderation_blocked", model.StudioJobUncertain,
+			"upstream submission could not be confirmed; do not automatically resubmit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, token, userID := setupStudioJobsTest(t)
+			require.NoError(t, model.DB.AutoMigrate(&model.ChannelStatusCheck{}))
+			var calls atomic.Int32
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.statusCode)
+				_, _ = fmt.Fprintf(w, `{"error":{"message":"private upstream policy details","type":"invalid_request_error","code":%q}}`, tt.code)
+			}))
+			defer upstream.Close()
+			createStudioJobChannel(t, upstream.URL, "gpt-image-1", constant.ChannelTypeOpenAI)
+			job, response := submitStudioJobTest(t, router, token, common.GetUUID(), "/jobs/images/generations",
+				`{"model":"gpt-image-1","prompt":"policy fixture","n":1,"size":"1024x1024"}`)
+			require.Equal(t, http.StatusAccepted, response.Code, response.Body.String())
+
+			require.NoError(t, runVideoStudioJobs(context.Background(), "policy-first"))
+			persisted, err := model.FindStudioJob(userID, job.ID)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStatus, persisted.Status)
+			assert.Equal(t, tt.wantError, persisted.Error)
+			require.Eventually(t, func() bool {
+				quota, err := model.GetUserQuota(userID, false)
+				return err == nil && quota == 10_000_000
+			}, time.Second, 10*time.Millisecond, "an unsuccessful relay must refund its reservation")
+			captured, err := os.ReadFile(service.VideoStudioJobPath(job.ID, "response.bin"))
+			require.NoError(t, err)
+			if tt.wantStatus == model.StudioJobFailed {
+				assert.Contains(t, string(captured), `"code":"content_policy_violation"`)
+				assert.NotContains(t, string(captured), "private upstream")
+			}
+
+			require.NoError(t, runVideoStudioJobs(context.Background(), "policy-second"))
+			assert.Equal(t, int32(1), calls.Load())
+			quota, err := model.GetUserQuota(userID, false)
+			require.NoError(t, err)
+			assert.Equal(t, 10_000_000, quota)
+			_, err = os.Stat(service.VideoStudioJobPath(job.ID, "result.json"))
+			assert.True(t, os.IsNotExist(err))
+		})
+	}
 }
 
 func TestVideoStudioJobCrashRecoveryDoesNotResubmit(t *testing.T) {

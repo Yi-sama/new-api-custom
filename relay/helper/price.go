@@ -184,6 +184,14 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		}
 		priceData.QuotaToPreConsume = quota
 	}
+	if info.FastMode {
+		priceData.AddOtherRatio("fast_mode", relaycommon.FastModeRatio)
+		quota, err := common.QuotaFromFloatStrict(float64(priceData.QuotaToPreConsume) * relaycommon.FastModeRatio)
+		if err != nil {
+			return hosttypes.PriceData{}, err
+		}
+		priceData.QuotaToPreConsume = quota
+	}
 
 	if common.DebugEnabled {
 		logger.LogDebug(c, "model_price_helper result: %s", priceData.ToSetting())
@@ -302,7 +310,7 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, promptT
 
 	// Expression coefficients are $/1M tokens prices; convert to quota the same way per-call billing does.
 	quotaBeforeGroup := rawCost / 1_000_000 * common.QuotaPerUnit
-	preConsumedQuota, err := billingexpr.QuotaRoundStrict(quotaBeforeGroup * groupRatioInfo.GroupRatio)
+	preConsumedQuota, err := billingexpr.QuotaRoundStrict(quotaBeforeGroup * groupRatioInfo.GroupRatio * info.FastModeBillingRatio())
 	if err != nil {
 		return hosttypes.PriceData{}, err
 	}
@@ -337,6 +345,9 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, promptT
 		FreeModel:         freeModel,
 		GroupRatioInfo:    groupRatioInfo,
 		QuotaToPreConsume: preConsumedQuota,
+	}
+	if info.FastMode {
+		priceData.AddOtherRatio("fast_mode", relaycommon.FastModeRatio)
 	}
 
 	logger.LogDebug(c, "model_price_helper_tiered result: model=%s preConsume=%d quotaBeforeGroup=%.2f groupRatio=%.2f tier=%s", info.OriginModelName, preConsumedQuota, quotaBeforeGroup, groupRatioInfo.GroupRatio, trace.MatchedTier)

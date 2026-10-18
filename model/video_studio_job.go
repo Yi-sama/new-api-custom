@@ -30,7 +30,7 @@ type StudioJob struct {
 	Group       string          `json:"group" gorm:"type:varchar(64)"`
 	Model       string          `json:"model" gorm:"type:varchar(191)"`
 	Prompt      string          `json:"prompt" gorm:"type:text"`
-	Parameters  json.RawMessage `json:"parameters" gorm:"type:text"`
+	Parameters  json.RawMessage `json:"parameters" gorm:"type:text;serializer:json"`
 	Status      string          `json:"status" gorm:"type:varchar(16);index"`
 	CreatedAt   int64           `json:"created_at" gorm:"index:idx_studio_history"`
 	UpdatedAt   int64           `json:"updated_at"`
@@ -89,9 +89,54 @@ func UnfinishedStudioJobs() ([]StudioJob, error) {
 	return jobs, err
 }
 
-func ClaimStudioJob(runnerTask string) (*StudioJob, error) {
+type StudioJobFilter struct {
+	Kind         string
+	Group        string
+	Model        string
+	Models       []string
+	ExcludeRoute bool
+}
+
+func (f StudioJobFilter) Matches(job StudioJobFilter) bool {
+	if f.Kind != job.Kind {
+		return false
+	}
+	if f.Group == "" && f.Model == "" && len(f.Models) == 0 {
+		return true
+	}
+	models := f.Models
+	if len(models) == 0 {
+		models = []string{f.Model}
+	}
+	matches := false
+	for _, imageModel := range models {
+		if imageModel == job.Model {
+			matches = f.Group == job.Group
+			break
+		}
+	}
+	return matches != f.ExcludeRoute
+}
+
+func ClaimStudioJob(runnerTask string, filters ...StudioJobFilter) (*StudioJob, error) {
 	var job StudioJob
-	if err := DB.Where("status = ?", StudioJobQueued).Order("created_at, id").First(&job).Error; err != nil {
+	query := DB.Where("status = ?", StudioJobQueued)
+	if len(filters) > 0 {
+		filter := filters[0]
+		query = query.Where("kind = ?", filter.Kind)
+		if filter.Group != "" || filter.Model != "" || len(filter.Models) > 0 {
+			models := filter.Models
+			if len(models) == 0 {
+				models = []string{filter.Model}
+			}
+			if filter.ExcludeRoute {
+				query = query.Where("("+commonGroupCol+" <> ? OR model NOT IN ?)", filter.Group, models)
+			} else {
+				query = query.Where(commonGroupCol+" = ? AND model IN ?", filter.Group, models)
+			}
+		}
+	}
+	if err := query.Order("created_at, id").First(&job).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -110,5 +155,6 @@ func ClaimStudioJob(runnerTask string) (*StudioJob, error) {
 func SaveStudioJobState(job *StudioJob) error {
 	job.UpdatedAt = common.GetTimestamp()
 	return DB.Model(&StudioJob{}).Where("id = ? AND runner_task = ?", job.ID, job.RunnerTask).
+		Where("status <> ?", StudioJobSucceeded).
 		Updates(map[string]any{"status": job.Status, "error": job.Error, "task_id": job.TaskID, "updated_at": job.UpdatedAt}).Error
 }

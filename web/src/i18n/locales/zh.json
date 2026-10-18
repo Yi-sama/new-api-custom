@@ -3075,6 +3075,10 @@
     "MySQL is production ready. Ensure automated backups and a dedicated user with the minimal required privileges are configured.": "MySQL 已准备好投入生产环境。请确保配置了自动备份以及具有最低所需权限的专用用户。",
     "N/A": "不适用",
     "Name": "名称",
+    "Fast mode": "Fast 模式",
+    "Fast {{ratio}}x": "Fast {{ratio}}x",
+    "Fast · standard {{ratio}}x": "Fast · 标准计费 {{ratio}}x",
+    "Fast requested": "已请求 Fast",
     "Name *": "名称 *",
     "Name for this redemption code (1-20 characters)": "此兑换码的名称（1-20 个字符）",
     "Name is available": "名称可用",
@@ -5846,6 +5850,21 @@
     "{{matched}} matched, {{unmatched}} unmatched requests": "已匹配 {{matched}} 条，未匹配 {{unmatched}} 条",
     "Open Tavern": "打开酒馆",
     "Back to dashboard": "返回控制台",
-    "Tavern is only available in the local test environment.": "酒馆目前仅在本地测试环境开放。"
+    "Tavern is only available in the local test environment.": "酒馆目前仅在本地测试环境开放。",
+    "Fast group settings": "Fast 分组设置",
+    "Fast billing multiplier": "Fast 计费倍率",
+    "Groups allowed to use Fast": "允许使用 Fast 的分组",
+    "{{count}} groups selected": "已选择 {{count}} 个分组",
+    "Failed to load groups": "加载分组失败",
+    "No groups available": "暂无可用分组",
+    "Per Second": "按秒计费",
+    "second": "秒",
+    "Video pricing": "视频计费",
+    "Resolution": "分辨率",
+    "Duration (seconds)": "时长（秒）",
+    "Estimated charge": "预计扣费",
+    "Price per second (CNY)": "单价（元/秒）",
+    "Cost for {{seconds}} seconds": "{{seconds}} 秒费用（元）",
+    "Charged by resolution and requested duration, not a flat request fee. Failed tasks are refunded.": "按分辨率和请求时长计费，不是固定每次收费；失败任务退还已扣额度。"
   }
 }

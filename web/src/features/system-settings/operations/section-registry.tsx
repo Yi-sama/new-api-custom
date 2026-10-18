@@ -1,6 +1,7 @@
 import { AutoModelSettings } from '../extra/auto-model.tsx'
 import { ChannelHealthSettings } from '../extra/channel-health.tsx'
 import { ChannelStatusSettings } from '../extra/channel-status.tsx'
+import { FastModeSettings } from '../extra/fast-mode'
 import { InactiveUsersSettings } from '../extra/inactive-users.tsx'
 import { NikoGroupSyncSettings } from '../extra/niko-group-sync.tsx'
 import { StatusImageSettings } from '../extra/status-image'
@@ -153,6 +154,15 @@ const OPERATIONS_SECTIONS = [
     build: (settings: OperationsSettings) => (
       <AutoModelSettings
         AutoModelDefaultModels={settings.AutoModelDefaultModels}
+      />
+    ),
+  },
+  {
+    id: 'fast-mode',
+    titleKey: 'Fast group settings',
+    build: (settings: OperationsSettings) => (
+      <FastModeSettings
+        FastModeAllowedGroups={settings.FastModeAllowedGroups}
       />
     ),
   },

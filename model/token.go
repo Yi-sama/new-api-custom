@@ -28,6 +28,7 @@ type Token struct {
 	UsedQuota          int            `json:"used_quota" gorm:"default:0"` // used quota
 	Group              string         `json:"group" gorm:"default:''"`
 	CrossGroupRetry    bool           `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
+	FastMode           bool           `json:"fast_mode"`
 	AutoGroups         string         `json:"-" gorm:"type:text"`
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
@@ -313,7 +314,14 @@ func (token *Token) Update() (err error) {
 		common.SysLog("failed to invalidate token cache before update: " + cacheErr.Error())
 	}
 	return DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry", "auto_groups").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry", "fast_mode", "auto_groups").Updates(token).Error
+}
+
+func (token *Token) UpdateFastMode() (err error) {
+	if cacheErr := invalidateTokenCacheForMutation(token.Key); cacheErr != nil {
+		common.SysLog("failed to invalidate token cache before fast mode update: " + cacheErr.Error())
+	}
+	return DB.Model(token).Select("fast_mode").Updates(token).Error
 }
 
 func (token *Token) SelectUpdate() (err error) {

@@ -362,11 +362,21 @@ func getAutoModelRetryGroup(c *gin.Context, tokenGroup string) string {
 }
 
 func prepareSelectedChannelBilling(c *gin.Context, info *relaycommon.RelayInfo, tokens int, meta *types.TokenCountMeta) *types.NewAPIError {
-	if info.TieredBillingSnapshot != nil && info.TieredBillingSnapshot.ModelName == info.OriginModelName {
+	if info.TokenFastMode {
+		// Fast eligibility depends on the channel selected for this attempt. Do
+		// not initialize ChannelMeta during initial pricing because nil is the
+		// sentinel that preserves the distributor-selected first channel.
+		info.InitChannelMeta(c)
+		if err := helper.ModelMappedHelper(c, info, nil); err != nil {
+			return types.NewError(err, types.ErrorCodeChannelModelMappedError, types.ErrOptionWithSkipRetry())
+		}
+		info.ConfigureFastMode()
+	}
+	if !info.TokenFastMode && info.TieredBillingSnapshot != nil && info.TieredBillingSnapshot.ModelName == info.OriginModelName {
 		return service.PrepareTieredBillingForSelectedGroup(c, info)
 	}
 	// The initial selection was already priced and reserved before the retry loop.
-	if info.RetryIndex == 0 {
+	if info.RetryIndex == 0 && !info.FastMode {
 		return nil
 	}
 	// A retry may select a different model. Clear model-specific expression state
@@ -392,6 +402,14 @@ func prepareSelectedChannelBilling(c *gin.Context, info *relaycommon.RelayInfo, 
 func clientFacingRelayError(err *types.NewAPIError, upstreamRequestAttempted bool) *types.NewAPIError {
 	if err == nil || !upstreamRequestAttempted || err.StatusCode == http.StatusTooManyRequests || err.StatusCode/100 == 5 {
 		return err
+	}
+	if code := err.ToOpenAIError().Code; err.StatusCode == http.StatusBadRequest &&
+		(code == "content_policy_violation" || code == "moderation_blocked") {
+		return types.WithOpenAIError(types.OpenAIError{
+			Message: "The request was rejected by upstream content policy",
+			Type:    "invalid_request_error",
+			Code:    "content_policy_violation",
+		}, http.StatusBadRequest)
 	}
 	return types.WithOpenAIError(types.OpenAIError{
 		Message: "上游服务暂不可用",

@@ -312,6 +312,13 @@ func applyHeaderOverrideToRequest(req *http.Request, headerOverride map[string]s
 }
 
 func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
+	requestBody, fastBodyCloser, err := info.FastModeRequestBody(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("apply Fast mode: %w", err)
+	}
+	if fastBodyCloser != nil {
+		defer fastBodyCloser.Close()
+	}
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
@@ -539,6 +546,7 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	if resp == nil {
 		return nil, errors.New("resp is nil")
 	}
+	info.ObserveFastModeProtocol(resp.Header)
 	if common2.GetContextKeyString(c, mainconstant.ContextKeyStudioJobID) != "" && mainconstant.MaxFileDownloadMB > 0 {
 		resp.Body = http.MaxBytesReader(nil, resp.Body, int64(mainconstant.MaxFileDownloadMB)*1024*1024)
 	}

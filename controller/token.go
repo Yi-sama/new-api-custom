@@ -35,11 +35,38 @@ func (input *tokenAutoGroupsInput) UnmarshalJSON(data []byte) error {
 type tokenRequest struct {
 	model.Token
 	AutoGroups tokenAutoGroupsInput `json:"auto_groups"`
+	FastMode   *bool                `json:"fast_mode"`
 }
 
 type tokenResponse struct {
 	*model.Token
-	AutoGroups []string `json:"auto_groups"`
+	AutoGroups        []string `json:"auto_groups"`
+	FastModeAvailable bool     `json:"fast_mode_available"`
+}
+
+func tokenFastModeAvailable(token *model.Token, autoGroups []string) bool {
+	group := token.Group
+	if group != "" && group != "auto" {
+		return setting.IsFastModeAllowedForGroup(group)
+	}
+	user, err := model.GetUserCache(token.UserId)
+	if err != nil || user.Group == "" {
+		return false
+	}
+	userGroup := user.Group
+	if group == "" && userGroup != "auto" {
+		return setting.IsFastModeAllowedForGroup(userGroup)
+	}
+	groups := service.GetUserAutoGroup(userGroup)
+	if len(autoGroups) > 0 {
+		groups = service.FilterUserTokenAutoGroups(userGroup, autoGroups)
+	}
+	for _, candidate := range groups {
+		if setting.IsFastModeAllowedForGroup(candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func maxTokenQuota() int {
@@ -66,7 +93,10 @@ func buildMaskedTokenResponse(token *model.Token) *tokenResponse {
 	if len(autoGroups) == 0 {
 		autoGroups = nil
 	}
-	return &tokenResponse{Token: &maskedToken, AutoGroups: autoGroups}
+	return &tokenResponse{
+		Token: &maskedToken, AutoGroups: autoGroups,
+		FastModeAvailable: err == nil && tokenFastModeAvailable(token, autoGroups),
+	}
 }
 
 func buildMaskedTokenResponses(tokens []*model.Token) []*tokenResponse {
@@ -318,6 +348,10 @@ func AddToken(c *gin.Context) {
 		token.CrossGroupRetry = false
 		_ = token.SetAutoGroups(nil)
 	}
+	fastMode := false
+	if request.FastMode != nil {
+		fastMode = *request.FastMode
+	}
 	key, err := common.GenerateKey()
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTokenGenerateFailed)
@@ -338,6 +372,7 @@ func AddToken(c *gin.Context) {
 		AllowIps:           token.AllowIps,
 		Group:              token.Group,
 		CrossGroupRetry:    token.CrossGroupRetry,
+		FastMode:           fastMode,
 		AutoGroups:         token.AutoGroups,
 	}
 	err = cleanToken.Insert()
@@ -372,6 +407,28 @@ func UpdateToken(c *gin.Context) {
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if c.Query("fast_mode_only") == "true" {
+		if request.FastMode == nil {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+		cleanToken, err := model.GetTokenByIds(request.Id, userId)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		cleanToken.FastMode = *request.FastMode
+		if err = cleanToken.UpdateFastMode(); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+			"data":    buildMaskedTokenResponse(cleanToken),
+		})
 		return
 	}
 	token := request.Token
@@ -418,6 +475,9 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
 		cleanToken.CrossGroupRetry = token.CrossGroupRetry
+		if request.FastMode != nil {
+			cleanToken.FastMode = *request.FastMode
+		}
 		if token.Group != "auto" {
 			cleanToken.CrossGroupRetry = false
 			_ = cleanToken.SetAutoGroups(nil)

@@ -16,9 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, Loader2 } from 'lucide-react'
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { BadgeCell } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
@@ -28,6 +30,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
 import {
   Tooltip,
   TooltipContent,
@@ -36,8 +39,74 @@ import {
 import { copyToClipboard } from '@/lib/copy-to-clipboard'
 import { formatQuota } from '@/lib/format'
 
+import { updateApiKeyFastMode } from '../api'
+import { ERROR_MESSAGES } from '../constants'
 import type { ApiKey } from '../types'
 import { useApiKeys } from './api-keys-provider'
+
+type ApiKeysQueryData = {
+  items: ApiKey[]
+  total: number
+}
+
+export function ApiKeyFastModeCell({ apiKey }: { apiKey: ApiKey }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const updateFastMode = useMutation({
+    mutationFn: (fastMode: boolean) =>
+      updateApiKeyFastMode(apiKey.id, fastMode),
+    onSuccess: (result, nextFastMode) => {
+      if (!result.success) {
+        toast.error(result.message || t(ERROR_MESSAGES.UPDATE_FAILED))
+        return
+      }
+
+      const fastMode = result.data?.fast_mode ?? nextFastMode
+      queryClient.setQueriesData<ApiKeysQueryData>(
+        { queryKey: ['keys'] },
+        (data) => {
+          if (!data) return data
+          return {
+            ...data,
+            items: data.items.map((item) =>
+              item.id === apiKey.id
+                ? {
+                    ...item,
+                    fast_mode: fastMode,
+                    fast_mode_available:
+                      result.data?.fast_mode_available ??
+                      item.fast_mode_available,
+                  }
+                : item
+            ),
+          }
+        }
+      )
+    },
+    onError: () => {
+      toast.error(t(ERROR_MESSAGES.UPDATE_FAILED))
+    },
+  })
+
+  if (!apiKey.fast_mode_available) {
+    return <span className='text-muted-foreground text-xs'>--</span>
+  }
+
+  return (
+    <div className='flex items-center gap-2'>
+      <Switch
+        size='sm'
+        checked={apiKey.fast_mode ?? false}
+        onCheckedChange={(fastMode) => updateFastMode.mutate(fastMode)}
+        disabled={updateFastMode.isPending}
+        aria-label={t('Fast mode')}
+      />
+      <span className='text-muted-foreground text-xs font-medium tabular-nums'>
+        1.5x
+      </span>
+    </div>
+  )
+}
 
 export function ApiKeyCell({ apiKey }: { apiKey: ApiKey }) {
   const { t } = useTranslation()

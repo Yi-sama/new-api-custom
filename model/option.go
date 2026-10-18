@@ -120,6 +120,7 @@ func InitOptionMap() {
 	common.OptionMap["Chats"] = setting.Chats2JsonString()
 	common.OptionMap["AutoGroups"] = setting.AutoGroups2JsonString()
 	common.OptionMap[setting.AutoModelDefaultModelsOptionKey] = setting.AutoModelDefaultModels2JSONString()
+	common.OptionMap[setting.FastModeAllowedGroupsOptionKey] = setting.FastModeAllowedGroups2JSONString()
 	common.OptionMap["DefaultUseAutoGroup"] = strconv.FormatBool(setting.DefaultUseAutoGroup)
 	common.OptionMap["MaxTokenAutoGroups"] = strconv.Itoa(setting.GetMaxTokenAutoGroups())
 	common.OptionMap["PayMethods"] = operation_setting.PayMethods2JsonString()
@@ -223,6 +224,9 @@ func validateOptionValue(key string, value string) error {
 	if key == setting.AutoModelDefaultModelsOptionKey {
 		return setting.ValidateAutoModelDefaultModels(value)
 	}
+	if key == setting.FastModeAllowedGroupsOptionKey {
+		return setting.ValidateFastModeAllowedGroups(value)
+	}
 	if key == NikoGroupSyncOptionKey {
 		return ValidateNikoGroupSyncConfig(value)
 	}
@@ -236,7 +240,7 @@ func validateOptionValue(key string, value string) error {
 }
 
 func UpdateOption(key string, value string) error {
-	if key == StatusImageConfigOptionKey {
+	if key == StatusImageConfigOptionKey || key == setting.FastModeAllowedGroupsOptionKey {
 		return UpdateOptionsBulk(map[string]string{key: value})
 	}
 	if err := validateOptionValue(key, value); err != nil {
@@ -442,6 +446,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = setting.UpdateAutoGroupsByJsonString(value)
 	case setting.AutoModelDefaultModelsOptionKey:
 		err = setting.UpdateAutoModelDefaultModelsByJSONString(value)
+	case setting.FastModeAllowedGroupsOptionKey:
+		err = setting.UpdateFastModeAllowedGroupsByJSONString(value)
 	case "MaxTokenAutoGroups":
 		err = setting.UpdateMaxTokenAutoGroups(value)
 	case "CustomCallbackAddress":

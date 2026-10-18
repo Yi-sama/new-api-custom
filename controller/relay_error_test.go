@@ -43,3 +43,22 @@ func TestClientFacingRelayErrorPreservesLocalRateLimitAndServerErrors(t *testing
 		})
 	}
 }
+
+func TestClientFacingRelayErrorPreservesContentPolicyRejection(t *testing.T) {
+	for _, code := range []string{"content_policy_violation", "moderation_blocked"} {
+		t.Run(code, func(t *testing.T) {
+			original := types.WithOpenAIError(types.OpenAIError{
+				Message: "private upstream policy details",
+				Type:    "invalid_request_error",
+				Code:    code,
+			}, http.StatusBadRequest)
+
+			clientError := clientFacingRelayError(original, true)
+
+			require.Equal(t, http.StatusBadRequest, clientError.StatusCode)
+			require.Equal(t, "content_policy_violation", clientError.ToOpenAIError().Code)
+			require.Equal(t, "invalid_request_error", clientError.ToOpenAIError().Type)
+			require.NotContains(t, clientError.ToOpenAIError().Message, "private upstream")
+		})
+	}
+}

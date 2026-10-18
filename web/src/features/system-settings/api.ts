@@ -88,6 +88,15 @@ export async function updateSystemOption(request: UpdateOptionRequest) {
   return res.data
 }
 
+export async function updateFastModeGroups(groups: string[]) {
+  const res = await api.put<UpdateOptionResponse>(
+    '/api/option/',
+    { key: 'FastModeAllowedGroups', value: JSON.stringify(groups) },
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
+  return res.data
+}
+
 export async function confirmPaymentCompliance() {
   const res = await api.post<ConfirmPaymentComplianceResponse>(
     '/api/option/payment_compliance',

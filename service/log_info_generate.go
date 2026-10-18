@@ -79,6 +79,17 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	other["cache_ratio"] = cacheRatio
 	other["model_price"] = modelPrice
 	other["user_group_ratio"] = userGroupRatio
+	if relayInfo.FastModeRequested {
+		other["fast_mode"] = true
+		other["fast_mode_ratio"] = relayInfo.FastModeBillingRatio()
+		other["service_tier_requested"] = "priority"
+		if relayInfo.FastModeProtocol != "" {
+			other["fast_mode_billing_protocol"] = relayInfo.FastModeProtocol
+		}
+		if relayInfo.FastModeTier != "" {
+			other["service_tier"] = relayInfo.FastModeTier
+		}
+	}
 	relayInfo.PriceData.GroupRatioInfo.AppendLogFields(other)
 	other["frt"] = float64(relayInfo.FirstResponseTime.UnixMilli() - relayInfo.StartTime.UnixMilli())
 	if relayInfo.ReasoningEffort != "" {

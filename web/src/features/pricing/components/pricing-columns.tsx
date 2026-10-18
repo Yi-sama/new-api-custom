@@ -42,6 +42,7 @@ import {
 } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
+import { VideoPriceSummary } from './video-pricing'
 
 // ----------------------------------------------------------------------------
 // Pricing Table Columns
@@ -114,6 +115,11 @@ export function usePricingColumns(
       ),
       cell: ({ row }) => {
         const model = row.original
+        if (model.video_pricing) {
+          return (
+            <VideoPriceSummary model={model} selectedGroup={selectedGroup} />
+          )
+        }
         const dynamicSummary = getDynamicPricingSummary(model, {
           tokenUnit,
           showRechargePrice,

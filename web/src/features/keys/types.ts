@@ -43,6 +43,8 @@ export const apiKeySchema = z.object({
     }, z.boolean())
     .optional()
     .default(false),
+  fast_mode: z.boolean().default(false),
+  fast_mode_available: z.boolean().optional(),
   model_limits_enabled: z.boolean(),
   model_limits: z.string().nullish().default(''),
   allow_ips: z.string().nullish().default(''),
@@ -94,6 +96,7 @@ export interface ApiKeyFormData {
   group: string
   auto_groups: string[]
   cross_group_retry: boolean
+  fast_mode: boolean
 }
 
 export interface TokenAutoGroupsConfig {

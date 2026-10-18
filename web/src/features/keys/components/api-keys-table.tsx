@@ -53,7 +53,11 @@ import {
   ERROR_MESSAGES,
 } from '../constants'
 import type { ApiKey } from '../types'
-import { ApiKeyCell, UnlimitedQuotaBadge } from './api-keys-cells'
+import {
+  ApiKeyCell,
+  ApiKeyFastModeCell,
+  UnlimitedQuotaBadge,
+} from './api-keys-cells'
 import { useApiKeysColumns } from './api-keys-columns'
 import { useApiKeys } from './api-keys-provider'
 import { DataTableBulkActions } from './data-table-bulk-actions'
@@ -156,6 +160,11 @@ function ApiKeysMobileList({
                   copyable={false}
                 />
               )}
+            </div>
+
+            <div className='flex items-center justify-between gap-2 text-xs'>
+              <span className='text-muted-foreground'>{t('Fast mode')}</span>
+              <ApiKeyFastModeCell apiKey={apiKey} />
             </div>
 
             <div className='flex min-w-0 items-center justify-between gap-2'>

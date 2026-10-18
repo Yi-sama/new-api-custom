@@ -108,6 +108,24 @@ export async function updateApiKeyStatus(
   return res.data
 }
 
+export async function updateApiKeyFastMode(
+  id: number,
+  fastMode: boolean
+): Promise<ApiResponse<ApiKey>> {
+  const res = await api.put(
+    '/api/token/?fast_mode_only=true',
+    {
+      id,
+      fast_mode: fastMode,
+    },
+    {
+      skipBusinessError: true,
+      skipErrorHandler: true,
+    }
+  )
+  return res.data
+}
+
 // Fetch the real (unmasked) key for a token by ID
 export async function fetchTokenKey(
   id: number

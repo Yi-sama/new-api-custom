@@ -78,11 +78,14 @@ export function filterByQuotaType(
   quotaType: string
 ): PricingModel[] {
   if (quotaType === QUOTA_TYPES.ALL) return models
+  if (quotaType === QUOTA_TYPES.SECOND) {
+    return models.filter((model) => Boolean(model.video_pricing))
+  }
   const targetType =
     quotaType === QUOTA_TYPES.TOKEN
       ? QUOTA_TYPE_VALUES.TOKEN
       : QUOTA_TYPE_VALUES.REQUEST
-  return models.filter((m) => m.quota_type === targetType)
+  return models.filter((m) => m.quota_type === targetType && !m.video_pricing)
 }
 
 /**
@@ -183,7 +186,7 @@ export function extractAllTags(models: PricingModel[]): string[] {
     }
   })
 
-  return Array.from(tagSet).sort((a, b) => a.localeCompare(b))
+  return [...tagSet].sort((a, b) => a.localeCompare(b))
 }
 
 /**

@@ -13,9 +13,84 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetAndValidateImageEditRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, path := range []string{"/v1/images/edits", "/pg/images/edits"} {
+		for _, test := range []struct {
+			n       string
+			wantN   uint
+			wantErr bool
+		}{
+			{n: "", wantN: 1},
+			{n: "0", wantN: 1},
+			{n: "1", wantN: 1},
+			{n: "2", wantN: 2},
+			{n: fmt.Sprint(dto.MaxImageN), wantN: dto.MaxImageN},
+			{n: "-1", wantErr: true},
+			{n: "1.5", wantErr: true},
+			{n: "invalid", wantErr: true},
+			{n: fmt.Sprint(dto.MaxImageN + 1), wantErr: true},
+			{n: "18446744073686646784", wantErr: true},
+		} {
+			t.Run(path+"/n="+test.n, func(t *testing.T) {
+				var body bytes.Buffer
+				writer := multipart.NewWriter(&body)
+				require.NoError(t, writer.WriteField("model", "gpt-image-2"))
+				require.NoError(t, writer.WriteField("prompt", "edit the reference"))
+				require.NoError(t, writer.WriteField("size", "1536x864"))
+				require.NoError(t, writer.WriteField("stream", "false"))
+				if test.n != "" {
+					require.NoError(t, writer.WriteField("n", test.n))
+				}
+				part, err := writer.CreateFormFile("image", "reference.png")
+				require.NoError(t, err)
+				_, err = part.Write([]byte("reference image bytes"))
+				require.NoError(t, err)
+				require.NoError(t, writer.Close())
+				original := append([]byte(nil), body.Bytes()...)
+				c, _ := gin.CreateTestContext(httptest.NewRecorder())
+				c.Request = httptest.NewRequest(http.MethodPost, path, &body)
+				c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+				t.Cleanup(func() {
+					common.CleanupBodyStorage(c)
+					if c.Request.MultipartForm != nil {
+						require.NoError(t, c.Request.MultipartForm.RemoveAll())
+					}
+				})
+				request, err := GetAndValidateRequest(c, types.RelayFormatOpenAIImage)
+				if test.wantErr {
+					require.ErrorContains(t, err, "n must be an integer between 1 and")
+					return
+				}
+				require.NoError(t, err)
+				imageRequest, ok := request.(*dto.ImageRequest)
+				require.True(t, ok)
+				require.NotNil(t, imageRequest.N)
+				assert.Equal(t, test.wantN, *imageRequest.N)
+				assert.Equal(t, "1536x864", imageRequest.Size)
+				require.NotNil(t, imageRequest.Stream)
+				assert.False(t, *imageRequest.Stream)
+				assert.Equal(t, float64(test.wantN), imageRequest.GetTokenCountMeta().BillingRatios["n"])
+				replayed, err := io.ReadAll(c.Request.Body)
+				require.NoError(t, err)
+				assert.Equal(t, original, replayed)
+				require.Len(t, c.Request.MultipartForm.File["image"], 1)
+				image, err := c.Request.MultipartForm.File["image"][0].Open()
+				require.NoError(t, err)
+				reference, err := io.ReadAll(image)
+				require.NoError(t, err)
+				require.NoError(t, image.Close())
+				assert.Equal(t, "reference image bytes", string(reference))
+			})
+		}
+	}
+}
 
 // TestGetAndValidOpenAIImageRequestMultipartStream verifies multipart image
 // edit parsing: the stream field is parsed and validated, and the request body

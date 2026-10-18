@@ -83,6 +83,7 @@ import {
   isTimingLogType,
 } from '../../lib/utils'
 import { USAGE_BILLING_PATH, type LogOtherData } from '../../types'
+import { FastModeBadge } from '../fast-mode-badge'
 
 // Maps a channel-update changed-field token (as recorded by the backend audit)
 // to its i18n label key for display in the audit details.
@@ -695,6 +696,26 @@ export function DetailsDialog(props: DetailsDialogProps) {
               value={props.log.group || other?.group || ''}
               mono
             />
+          )}
+
+          {other?.fast_mode === true && (
+            <>
+              <DetailRow
+                label={t('Fast mode')}
+                value={<FastModeBadge other={other} />}
+              />
+              <DetailRow
+                label={t('Fast billing multiplier')}
+                value={
+                  other.fast_mode_ratio != null &&
+                  Number.isFinite(other.fast_mode_ratio) &&
+                  other.fast_mode_ratio > 0
+                    ? `${other.fast_mode_ratio}x`
+                    : '-'
+                }
+                mono
+              />
+            </>
           )}
 
           {showAdminIp && (

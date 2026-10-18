@@ -59,6 +59,7 @@ const defaultOperationsSettings: OperationsSettings = {
   NikoGroupSyncConfig: '',
   ChannelStatusConfig: '',
   AutoModelDefaultModels: [],
+  FastModeAllowedGroups: [],
 }
 
 export function OperationsSettings() {

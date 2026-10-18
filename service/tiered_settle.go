@@ -3,6 +3,7 @@ package service
 import (
 	"net/http"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
@@ -108,7 +109,7 @@ func refreshTieredBillingGroup(relayInfo *relaycommon.RelayInfo) (*billingexpr.B
 		return snap, nil
 	}
 
-	estimatedQuotaAfterGroup := snap.EstimatedQuotaBeforeGroup * groupRatio
+	estimatedQuotaAfterGroup := snap.EstimatedQuotaBeforeGroup * groupRatio * relayInfo.FastModeBillingRatio()
 	estimatedQuota, err := billingexpr.QuotaRoundStrict(estimatedQuotaAfterGroup)
 	if err != nil {
 		return nil, err
@@ -184,6 +185,12 @@ func TryTieredSettle(relayInfo *relaycommon.RelayInfo, params billingexpr.TokenP
 	// consume log records it under admin_info, regardless of which caller
 	// (text, audio, WSS) consumes the returned quota. First non-nil wins.
 	noteQuotaClamp(relayInfo, tr.Clamp)
+	if relayInfo.FastMode {
+		tr.ActualQuotaBeforeGroup *= relayInfo.FastModeBillingRatio()
+		var clamp *common.QuotaClamp
+		tr.ActualQuotaAfterGroup, clamp = common.QuotaRoundChecked(tr.ActualQuotaBeforeGroup * snap.GroupRatio)
+		noteQuotaClamp(relayInfo, clamp)
+	}
 
 	return true, tr.ActualQuotaAfterGroup, &tr
 }

@@ -32,6 +32,12 @@ func SetVideoStudioRouter(router *gin.Engine) {
 	studio.GET("/jobs/:id", middleware.DisableCache(), controller.GetVideoStudioJob)
 	studio.GET("/jobs/:id/result", middleware.DisableCache(), controller.GetVideoStudioJobResult)
 	studio.GET("/jobs/:id/assets/:asset", middleware.DisableCache(), controller.GetVideoStudioJobResult)
+	storage := studio.Group("/storage")
+	storage.Use(middleware.DisableCache())
+	storage.GET("/workspace", controller.GetVideoStudioWorkspace)
+	storage.PUT("/workspace", controller.PutVideoStudioWorkspace)
+	storage.GET("/files/:key", controller.GetVideoStudioWorkspaceFile)
+	storage.PUT("/files/:key", controller.PutVideoStudioWorkspaceFile)
 
 	jobs := studio.Group("/jobs")
 	jobs.Use(middleware.RouteTag("relay"), middleware.SystemPerformanceCheck(), controller.VideoStudioGroupAuthorization(), middleware.ModelRequestRateLimit())

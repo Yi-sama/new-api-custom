@@ -114,6 +114,11 @@ export interface ToolSurchargeItem {
 }
 
 export interface LogOtherData {
+  fast_mode?: boolean
+  fast_mode_ratio?: number
+  service_tier_requested?: string
+  service_tier?: string
+  fast_mode_billing_protocol?: string
   admin_info?: {
     is_multi_key?: boolean
     multi_key_index?: number

@@ -36,6 +36,7 @@ type Pricing struct {
 	BillingMode            string                  `json:"billing_mode,omitempty"`
 	BillingExpr            string                  `json:"billing_expr,omitempty"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
+	VideoPricing           *VideoPricing           `json:"video_pricing,omitempty"`
 }
 
 type PricingVendor struct {
@@ -372,6 +373,7 @@ func updatePricing() {
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
+			pricing.VideoPricing = buildVideoPricing(model, meta)
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {

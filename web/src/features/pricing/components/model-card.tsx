@@ -35,6 +35,7 @@ import { formatPrice, formatRequestPrice } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { VideoPriceSummary } from './video-pricing'
 
 export interface ModelCardProps {
   model: PricingModel
@@ -97,6 +98,13 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       <span className='text-muted-foreground text-sm'>
         {t('Configured automatic selection')}
       </span>
+    )
+  } else if (props.model.video_pricing) {
+    priceSummary = (
+      <VideoPriceSummary
+        model={props.model}
+        selectedGroup={props.selectedGroup}
+      />
     )
   } else if (dynamicSummary) {
     if (dynamicSummary.isSpecialExpression) {
@@ -269,9 +277,11 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
               {item}
             </span>
           ))}
-          <span className='text-muted-foreground/50 text-xs'>
-            {tokenUnitLabel}
-          </span>
+          {isTokenBased && (
+            <span className='text-muted-foreground/50 text-xs'>
+              {tokenUnitLabel}
+            </span>
+          )}
           {hiddenCount > 0 && (
             <span className='text-muted-foreground/40 text-xs'>
               +{hiddenCount}

@@ -89,6 +89,7 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
             (item) =>
               ![
                 '/system-settings/operations/auto-model',
+                '/system-settings/operations/fast-mode',
                 '/system-settings/operations/niko-group-sync',
                 '/system-settings/operations/channel-health',
                 '/system-settings/operations/channel-status',
@@ -104,6 +105,10 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
             {
               title: 'Auto 默认设置',
               url: '/system-settings/operations/auto-model',
+            },
+            {
+              title: t('Fast group settings'),
+              url: '/system-settings/operations/fast-mode',
             },
             {
               title: '分组倍率同步',

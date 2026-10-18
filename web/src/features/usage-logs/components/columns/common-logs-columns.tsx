@@ -58,6 +58,7 @@ import {
 } from '../../lib/utils'
 import type { LogOtherData } from '../../types'
 import { DetailsDialog } from '../dialogs/details-dialog'
+import { FastModeBadge } from '../fast-mode-badge'
 import { LogCostDisplay } from '../log-cost-display'
 import { ModelBadge } from '../model-badge'
 import { TimingMetricsCell, StreamTpsCell } from '../timing-metrics-cell'
@@ -619,6 +620,7 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
               modelName={modelInfo.name}
               actualModel={modelInfo.actualModel}
             />
+            <FastModeBadge other={parseLogOther(log.other)} />
           </div>
         )
       },

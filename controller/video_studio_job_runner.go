@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,6 +43,13 @@ func (videoStudioJobsHandler) Run(ctx context.Context, task *model.SystemTask, r
 }
 
 func runVideoStudioJobs(ctx context.Context, runnerTask string) error {
+	if path := os.Getenv("VIDEO_STUDIO_PAUSE_FILE"); path != "" {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
 	jobs, err := model.UnfinishedStudioJobs()
 	if err != nil {
 		return err
@@ -92,17 +101,195 @@ func runVideoStudioJobs(ctx context.Context, runnerTask string) error {
 			return err
 		}
 	}
+	return runQueuedStudioJobs(ctx, runnerTask)
+}
+
+type studioImageCapacity struct {
+	UpdatedAt        int64    `json:"updated_at"`
+	Group            string   `json:"group"`
+	Model            string   `json:"model"`
+	Models           []string `json:"models,omitempty"`
+	Slots            int      `json:"slots"`
+	modelsConfigured bool
+}
+
+func (capacity *studioImageCapacity) UnmarshalJSON(data []byte) error {
+	var decoded struct {
+		UpdatedAt int64    `json:"updated_at"`
+		Group     string   `json:"group"`
+		Model     string   `json:"model"`
+		Models    []string `json:"models"`
+		Slots     int      `json:"slots"`
+	}
+	if err := common.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := common.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	_, modelsConfigured := fields["models"]
+	*capacity = studioImageCapacity{
+		UpdatedAt: decoded.UpdatedAt, Group: decoded.Group, Model: decoded.Model,
+		Models: decoded.Models, Slots: decoded.Slots, modelsConfigured: modelsConfigured,
+	}
+	return nil
+}
+
+func readStudioImageCapacity() (studioImageCapacity, error) {
+	value := os.Getenv("VIDEO_STUDIO_IMAGE_CONCURRENCY")
+	if value != "auto" {
+		if value == "" {
+			value = "1"
+		}
+		slots, err := strconv.Atoi(value)
+		if err != nil || slots < 1 {
+			return studioImageCapacity{}, errors.New("VIDEO_STUDIO_IMAGE_CONCURRENCY must be auto or a positive integer")
+		}
+		return studioImageCapacity{Slots: slots}, nil
+	}
+	file, err := os.Open(os.Getenv("VIDEO_STUDIO_IMAGE_CAPACITY_FILE"))
+	if err != nil {
+		return studioImageCapacity{}, fmt.Errorf("studio image capacity unavailable: %w", err)
+	}
+	defer file.Close()
+	var capacity studioImageCapacity
+	if err := common.DecodeJson(io.LimitReader(file, 16384), &capacity); err != nil {
+		return studioImageCapacity{}, fmt.Errorf("invalid studio image capacity: %w", err)
+	}
+	now := time.Now().Unix()
+	if capacity.Group == "" || capacity.Model == "" || capacity.Slots < 0 ||
+		capacity.UpdatedAt < now-60 || capacity.UpdatedAt > now+5 {
+		return studioImageCapacity{}, errors.New("studio image capacity is invalid or stale; new images remain queued")
+	}
+	if capacity.modelsConfigured {
+		if len(capacity.Models) == 0 {
+			return studioImageCapacity{}, errors.New("studio image capacity models must be a nonempty array")
+		}
+		models := make(map[string]struct{}, len(capacity.Models))
+		for _, imageModel := range capacity.Models {
+			if imageModel == "" || imageModel != strings.TrimSpace(imageModel) {
+				return studioImageCapacity{}, errors.New("studio image capacity models must not contain blank entries")
+			}
+			if _, exists := models[imageModel]; exists {
+				return studioImageCapacity{}, errors.New("studio image capacity models must not contain duplicates")
+			}
+			models[imageModel] = struct{}{}
+		}
+		if _, exists := models[capacity.Model]; !exists {
+			return studioImageCapacity{}, errors.New("studio image capacity models must include model")
+		}
+	}
+	return capacity, nil
+}
+
+func runQueuedStudioJobs(ctx context.Context, runnerTask string) (runErr error) {
+	completed := make(chan *model.StudioJob)
+	active := make(map[string]model.StudioJobFilter)
+	refresh := time.NewTicker(5 * time.Second)
+	defer refresh.Stop()
+	inflight := 0
+	// Do not finish the system task or release its lease until every request
+	// has stopped and its final state has been saved, even on cancellation.
+	defer func() {
+		for inflight > 0 {
+			job := <-completed
+			inflight--
+			if err := model.SaveStudioJobState(job); err != nil {
+				runErr = errors.Join(runErr, err)
+			}
+		}
+	}()
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		job, err := model.ClaimStudioJob(runnerTask)
-		if err != nil || job == nil {
-			return err
+		if path := os.Getenv("VIDEO_STUDIO_PAUSE_FILE"); path != "" {
+			if _, err := os.Stat(path); err == nil {
+				return nil
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
 		}
-		executeStudioJob(ctx, job)
-		if err := model.SaveStudioJobState(job); err != nil {
-			return err
+		// Save completed work before claiming more, so a storage failure stops
+		// further submissions while the deferred drain preserves in-flight work.
+	drain:
+		for {
+			select {
+			case job := <-completed:
+				inflight--
+				delete(active, job.ID)
+				if err := model.SaveStudioJobState(job); err != nil {
+					return err
+				}
+			default:
+				break drain
+			}
+		}
+		capacity, capacityErr := readStudioImageCapacity()
+		type studioLane struct {
+			filter model.StudioJobFilter
+			slots  int
+		}
+		limits := []studioLane{{filter: model.StudioJobFilter{Kind: "video"}, slots: 1}}
+		if capacityErr == nil {
+			imageRoute := model.StudioJobFilter{Kind: "image", Group: capacity.Group, Model: capacity.Model, Models: capacity.Models}
+			limits = append(limits, studioLane{imageRoute, capacity.Slots})
+			if capacity.Group != "" {
+				imageRoute.ExcludeRoute = true
+				limits = append(limits, studioLane{imageRoute, 1})
+			}
+		}
+		for _, limit := range limits {
+			count := 0
+			for _, route := range active {
+				if limit.filter.Matches(route) {
+					count++
+				}
+			}
+			for count < limit.slots {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				job, err := model.ClaimStudioJob(runnerTask, limit.filter)
+				if err != nil {
+					return err
+				}
+				if job == nil {
+					break
+				}
+				if err := ctx.Err(); err != nil {
+					job.Status, job.Error = model.StudioJobQueued, ""
+					return errors.Join(err, model.SaveStudioJobState(job))
+				}
+				active[job.ID] = model.StudioJobFilter{Kind: job.Kind, Group: job.Group, Model: job.Model}
+				count++
+				inflight++
+				go func() {
+					defer func() {
+						if recovered := recover(); recovered != nil {
+							job.Status, job.Error = model.StudioJobUncertain, "generation was interrupted; do not automatically resubmit"
+							common.SysError(fmt.Sprintf("studio job %s interrupted: %v", job.ID, recovered))
+						}
+						completed <- job
+					}()
+					executeStudioJob(ctx, job)
+				}()
+			}
+		}
+		if inflight == 0 {
+			return capacityErr
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-refresh.C:
+		case job := <-completed:
+			inflight--
+			delete(active, job.ID)
+			if err := model.SaveStudioJobState(job); err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -140,6 +327,10 @@ func (w *studioResponseFile) Write(p []byte) (int, error) {
 func (w *studioResponseFile) Flush() {}
 
 func executeStudioJob(ctx context.Context, job *model.StudioJob) {
+	if ctx.Err() != nil {
+		job.Status, job.Error = model.StudioJobQueued, ""
+		return
+	}
 	job.Status, job.Error = model.StudioJobFailed, "generation could not be started"
 	input, err := os.Open(service.VideoStudioJobPath(job.ID, "request.bin"))
 	if err != nil {
@@ -202,6 +393,10 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 			studioJobError(c, http.StatusBadRequest, err.Error())
 			return
 		}
+		if ctx.Err() != nil {
+			studioJobError(c, http.StatusServiceUnavailable, "task runner stopped before submission")
+			return
+		}
 		c.Next()
 	}, middleware.Distribute(), func(c *gin.Context) {
 		if job.Kind == "video" {
@@ -211,6 +406,10 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 		}
 	})
 	router.ServeHTTP(writer, request)
+	if !attempted && ctx.Err() != nil {
+		job.Status, job.Error = model.StudioJobQueued, ""
+		return
+	}
 	if err := output.Sync(); err != nil {
 		writer.err = err
 	}
@@ -218,6 +417,18 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 		job.Error = "generation request was rejected"
 		if attempted {
 			job.Status, job.Error = model.StudioJobUncertain, "upstream submission could not be confirmed; do not automatically resubmit"
+			if job.Kind == "image" && writer.err == nil && writer.status == http.StatusBadRequest {
+				var rejection struct {
+					Error struct {
+						Code string `json:"code"`
+					} `json:"error"`
+				}
+				if _, err := output.Seek(0, io.SeekStart); err == nil &&
+					common.DecodeJson(io.LimitReader(output, 16384), &rejection) == nil &&
+					rejection.Error.Code == "content_policy_violation" {
+					job.Status, job.Error = model.StudioJobFailed, "image generation was rejected by upstream content policy"
+				}
+			}
 		}
 		return
 	}

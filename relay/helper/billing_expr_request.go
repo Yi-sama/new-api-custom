@@ -18,6 +18,11 @@ func ResolveIncomingBillingExprRequestInput(c *gin.Context, info *relaycommon.Re
 			merged[k] = v
 		}
 		input.Headers = merged
+		var err error
+		input.Body, err = info.FastModeStandardBillingBody(input.Body)
+		if err != nil {
+			return billingexpr.RequestInput{}, err
+		}
 		return input, nil
 	}
 
@@ -31,6 +36,12 @@ func ResolveIncomingBillingExprRequestInput(c *gin.Context, info *relaycommon.Re
 		return billingexpr.RequestInput{}, err
 	}
 	input.Body = bodyBytes
+	if info != nil {
+		input.Body, err = info.FastModeStandardBillingBody(input.Body)
+		if err != nil {
+			return billingexpr.RequestInput{}, err
+		}
+	}
 	return input, nil
 }
 
