@@ -65,7 +65,7 @@ import {
   deleteUserSubscription,
   resetUserSubscriptionsByPlan,
 } from '../../api'
-import { formatTimestamp } from '../../lib'
+import { formatTimestamp, getSubscriptionQuotaState } from '../../lib'
 import type { PlanRecord, UserSubscriptionRecord } from '../../types'
 
 interface Props {
@@ -79,11 +79,8 @@ function SubscriptionStatusBadge(props: {
   sub: UserSubscriptionRecord['subscription']
   t: (key: string) => string
 }) {
-  // eslint-disable-next-line react-hooks/purity
-  const now = Date.now() / 1000
-  const isExpired = (props.sub.end_time || 0) > 0 && props.sub.end_time < now
-  const isActive = props.sub.status === 'active' && !isExpired
-  if (isActive) {
+  const quotaState = getSubscriptionQuotaState(props.sub)
+  if (quotaState.isActive) {
     return (
       <StatusBadge
         label={props.t('Active')}
@@ -97,6 +94,15 @@ function SubscriptionStatusBadge(props: {
       <StatusBadge
         label={props.t('Invalidated')}
         variant='neutral'
+        copyable={false}
+      />
+    )
+  }
+  if (quotaState.hasRetainedBalance) {
+    return (
+      <StatusBadge
+        label={props.t('Retained balance')}
+        variant='success'
         copyable={false}
       />
     )
@@ -343,11 +349,24 @@ export function UserSubscriptionsDialog(props: Props) {
                   header: t('Total Quota'),
                   cell: (record) => {
                     const sub = record.subscription
-                    const total = Number(sub.amount_total || 0)
-                    const used = Number(sub.amount_used || 0)
-                    return total > 0
-                      ? `${formatQuota(used)}/${formatQuota(total)}`
-                      : t('Unlimited')
+                    const quotaState = getSubscriptionQuotaState(sub)
+                    if (quotaState.totalAmount <= 0) return t('Unlimited')
+                    if (!quotaState.isDaily) {
+                      return `${formatQuota(quotaState.usedAmount)}/${formatQuota(quotaState.totalAmount)}`
+                    }
+                    return (
+                      <div className='text-sm'>
+                        <div>
+                          {t('Unlocked quota')}:{' '}
+                          {formatQuota(quotaState.earnedAmount)}/
+                          {formatQuota(quotaState.totalAmount)}
+                        </div>
+                        <div className='text-muted-foreground'>
+                          {t('Available balance')}:{' '}
+                          {formatQuota(quotaState.availableAmount)}
+                        </div>
+                      </div>
+                    )
                   },
                 },
                 {
@@ -357,32 +376,31 @@ export function UserSubscriptionsDialog(props: Props) {
                   cellClassName: 'text-right',
                   cell: (record) => {
                     const sub = record.subscription
-                    const now = Date.now() / 1000
-                    const isExpired =
-                      (sub.end_time || 0) > 0 && sub.end_time < now
-                    const isActive = sub.status === 'active' && !isExpired
+                    const quotaState = getSubscriptionQuotaState(sub)
 
                     return (
                       <DataTableRowActionMenu ariaLabel={t('Actions')}>
+                        {!quotaState.isDaily && (
+                          <DropdownMenuItem
+                            disabled={!quotaState.isActive}
+                            onClick={() => {
+                              setAdvanceResetTime(true)
+                              setResetAction({
+                                planId: sub.plan_id,
+                                planTitle:
+                                  planTitleMap.get(sub.plan_id) ||
+                                  `#${sub.plan_id}`,
+                              })
+                            }}
+                          >
+                            {t('Reset quota')}
+                            <DropdownMenuShortcut>
+                              <RotateCcw size={16} />
+                            </DropdownMenuShortcut>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
-                          disabled={!isActive}
-                          onClick={() => {
-                            setAdvanceResetTime(true)
-                            setResetAction({
-                              planId: sub.plan_id,
-                              planTitle:
-                                planTitleMap.get(sub.plan_id) ||
-                                `#${sub.plan_id}`,
-                            })
-                          }}
-                        >
-                          {t('Reset quota')}
-                          <DropdownMenuShortcut>
-                            <RotateCcw size={16} />
-                          </DropdownMenuShortcut>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!isActive}
+                          disabled={!quotaState.isActive}
                           onClick={() =>
                             setConfirmAction({
                               type: 'invalidate',

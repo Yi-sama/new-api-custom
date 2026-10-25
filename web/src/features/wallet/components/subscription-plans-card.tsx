@@ -51,7 +51,11 @@ import {
   updateBillingPreference,
 } from '@/features/subscriptions/api'
 import { SubscriptionPurchaseDialog } from '@/features/subscriptions/components/dialogs/subscription-purchase-dialog'
-import { formatDuration, formatResetPeriod } from '@/features/subscriptions/lib'
+import {
+  formatDuration,
+  formatResetPeriod,
+  getSubscriptionQuotaState,
+} from '@/features/subscriptions/lib'
 import type {
   PlanRecord,
   UserSubscriptionRecord,
@@ -228,13 +232,6 @@ export function SubscriptionPlansCard({
     return Math.max(0, Math.ceil((endTime - now) / 86400))
   }
 
-  const getUsagePercent = (sub: UserSubscriptionRecord) => {
-    const total = Number(sub?.subscription?.amount_total || 0)
-    const used = Number(sub?.subscription?.amount_used || 0)
-    if (total <= 0) return 0
-    return Math.round((used / total) * 100)
-  }
-
   if (loading) {
     return (
       <Card data-card-hover='false' className='gap-0 overflow-hidden py-0'>
@@ -399,20 +396,23 @@ export function SubscriptionPlansCard({
               <div className='max-h-64 space-y-3 overflow-y-auto pr-1'>
                 {allSubscriptions.map((sub) => {
                   const subscription = sub.subscription
-                  const totalAmount = Number(subscription?.amount_total || 0)
-                  const usedAmount = Number(subscription?.amount_used || 0)
-                  const remainAmount =
-                    totalAmount > 0 ? Math.max(0, totalAmount - usedAmount) : 0
+                  const quotaState = getSubscriptionQuotaState(subscription)
+                  const {
+                    totalAmount,
+                    usedAmount,
+                    earnedAmount,
+                    availableAmount,
+                    isDaily,
+                    isActive,
+                    hasRetainedBalance,
+                    usagePercent,
+                  } = quotaState
                   const planTitle =
                     planTitleMap.get(subscription?.plan_id) || ''
                   const remainDays = getRemainingDays(sub)
-                  const usagePercent = getUsagePercent(sub)
-                  const now = Date.now() / 1000
-                  const isExpired = (subscription?.end_time || 0) < now
                   const isCancelled = subscription?.status === 'cancelled'
-                  const isActive =
-                    subscription?.status === 'active' && !isExpired
                   const nextResetTime = subscription?.next_reset_time ?? 0
+                  const nextGrantTime = subscription?.next_grant_time ?? 0
                   let statusBadge = (
                     <StatusBadge
                       label={t('Expired')}
@@ -424,6 +424,14 @@ export function SubscriptionPlansCard({
                     statusBadge = (
                       <StatusBadge
                         label={t('Active')}
+                        variant='success'
+                        copyable={false}
+                      />
+                    )
+                  } else if (hasRetainedBalance) {
+                    statusBadge = (
+                      <StatusBadge
+                        label={t('Retained balance')}
                         variant='success'
                         copyable={false}
                       />
@@ -473,26 +481,33 @@ export function SubscriptionPlansCard({
                           (subscription?.end_time || 0) * 1000
                         ).toLocaleString()}
                       </div>
-                      {isActive && nextResetTime > 0 && (
+                      {isDaily && isActive && nextGrantTime > 0 && (
+                        <div className='text-muted-foreground mt-1'>
+                          {t('Next daily grant')}:{' '}
+                          {new Date(nextGrantTime * 1000).toLocaleString()}
+                        </div>
+                      )}
+                      {!isDaily && isActive && nextResetTime > 0 && (
                         <div className='text-muted-foreground mt-1'>
                           {t('Next reset')}:{' '}
                           {new Date(nextResetTime * 1000).toLocaleString()}
                         </div>
                       )}
                       <div className='text-muted-foreground mt-1'>
-                        {t('Total Quota')}:{' '}
+                        {isDaily ? t('Unlocked quota') : t('Total Quota')}:{' '}
                         {totalAmount > 0 ? (
                           <Tooltip>
                             <TooltipTrigger
                               render={<span className='cursor-help' />}
                             >
-                              {formatQuota(usedAmount)}/
-                              {formatQuota(totalAmount)} · {t('Remaining')}{' '}
-                              {formatQuota(remainAmount)}
+                              {isDaily
+                                ? `${formatQuota(earnedAmount)}/${formatQuota(totalAmount)} · ${t('Available balance')} ${formatQuota(availableAmount)}`
+                                : `${formatQuota(usedAmount)}/${formatQuota(totalAmount)} · ${t('Remaining')} ${formatQuota(availableAmount)}`}
                             </TooltipTrigger>
                             <TooltipContent>
-                              {t('Raw Quota')}: {usedAmount}/{totalAmount} ·{' '}
-                              {t('Remaining')} {remainAmount}
+                              {isDaily
+                                ? `${t('Unlocked quota')}: ${earnedAmount}/${totalAmount} · ${t('Available balance')} ${availableAmount}`
+                                : `${t('Raw Quota')}: ${usedAmount}/${totalAmount} · ${t('Remaining')} ${availableAmount}`}
                             </TooltipContent>
                           </Tooltip>
                         ) : (
@@ -504,7 +519,7 @@ export function SubscriptionPlansCard({
                           </span>
                         )}
                       </div>
-                      {totalAmount > 0 && isActive && (
+                      {totalAmount > 0 && (isActive || hasRetainedBalance) && (
                         <Progress value={usagePercent} className='mt-2 h-1.5' />
                       )}
                     </div>
@@ -528,20 +543,35 @@ export function SubscriptionPlansCard({
               const plan = p?.plan
               if (!plan) return null
               const totalAmount = Number(plan.total_amount || 0)
+              const isDailyPlan = plan.quota_grant_mode === 'daily'
               const price = Number(plan.price_amount || 0).toFixed(2)
               const isPopular = index === 0 && plans.length > 1
               const limit = Number(plan.max_purchase_per_user || 0)
               const count = planPurchaseCountMap.get(plan.id) || 0
               const reached = limit > 0 && count >= limit
+              let expiryBenefit: string | null = null
+              if (isDailyPlan) {
+                expiryBenefit =
+                  plan.quota_expiry_policy === 'retain'
+                    ? t('Retain earned balance')
+                    : t('Expires with subscription')
+              }
 
               const benefits = [
                 `${t('Validity Period')}: ${formatDuration(plan, t)}`,
-                formatResetPeriod(plan, t) !== t('No Reset')
+                !isDailyPlan && formatResetPeriod(plan, t) !== t('No Reset')
                   ? `${t('Quota Reset')}: ${formatResetPeriod(plan, t)}`
                   : null,
+                isDailyPlan
+                  ? `${t('Quota Allocation')}: ${t('Daily accrual')}`
+                  : null,
+                isDailyPlan
+                  ? `${t('Daily amount')}: ${formatQuota(Number(plan.daily_amount || 0))}`
+                  : null,
                 totalAmount > 0
-                  ? `${t('Total Quota')}: ${formatQuota(totalAmount)}`
+                  ? `${isDailyPlan ? t('Lifetime quota cap') : t('Total Quota')}: ${formatQuota(totalAmount)}`
                   : `${t('Total Quota')}: ${t('Unlimited')}`,
+                expiryBenefit,
                 limit > 0 ? `${t('Purchase Limit')}: ${limit}` : null,
                 plan.upgrade_group
                   ? `${t('Upgrade Group')}: ${plan.upgrade_group}`

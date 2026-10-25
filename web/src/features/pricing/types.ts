@@ -58,11 +58,18 @@ export type PricingModel = {
   pricing_version?: string
   video_pricing?: {
     currency: 'CNY'
-    unit: 'second'
     duration_seconds: number[]
     default_resolution: string
-    prices: { resolution: string; price_per_second: number }[]
-  }
+  } & (
+    | {
+        unit: 'second'
+        prices: { resolution: string; price_per_second: number }[]
+      }
+    | {
+        unit: 'request'
+        prices: { resolution: string; price_per_request: number }[]
+      }
+  )
   /**
    * Optional model metadata fields reserved for backend-provided catalog data.
    * Keep them data-driven; do not synthesize display values on the client.

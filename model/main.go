@@ -314,6 +314,8 @@ func migrateDB() error {
 		&UserSession{},
 		&AuthFlow{},
 		&ExternalIdentityClaim{},
+		&QQBenefitRequest{},
+		&QQBenefitBinding{},
 		&PasskeyCredential{},
 		&Option{},
 		&Redemption{},
@@ -351,6 +353,8 @@ func migrateDB() error {
 		&TicketMessage{},
 		&TicketEvent{},
 		&ChannelStatusCheck{},
+		&DailyTokenPoolDay{},
+		&DailyTokenPoolReservation{},
 	)
 	if err != nil {
 		return err
@@ -390,6 +394,8 @@ func migrateDBFast() error {
 		{&UserSession{}, "UserSession"},
 		{&AuthFlow{}, "AuthFlow"},
 		{&ExternalIdentityClaim{}, "ExternalIdentityClaim"},
+		{&QQBenefitRequest{}, "QQBenefitRequest"},
+		{&QQBenefitBinding{}, "QQBenefitBinding"},
 		{&PasskeyCredential{}, "PasskeyCredential"},
 		{&Option{}, "Option"},
 		{&Redemption{}, "Redemption"},
@@ -425,6 +431,8 @@ func migrateDBFast() error {
 		{&TicketMessage{}, "TicketMessage"},
 		{&TicketEvent{}, "TicketEvent"},
 		{&ChannelStatusCheck{}, "ChannelStatusCheck"},
+		{&DailyTokenPoolDay{}, "DailyTokenPoolDay"},
+		{&DailyTokenPoolReservation{}, "DailyTokenPoolReservation"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))
@@ -598,6 +606,9 @@ func ensureSubscriptionPlanTableSQLite() error {
 ` + "`upgrade_group`" + ` varchar(64) DEFAULT '',
 ` + "`downgrade_group`" + ` varchar(64) DEFAULT '',
 ` + "`total_amount`" + ` bigint NOT NULL DEFAULT 0,
+` + "`quota_grant_mode`" + ` varchar(16) DEFAULT 'full',
+` + "`daily_amount`" + ` bigint DEFAULT 0,
+` + "`quota_expiry_policy`" + ` varchar(16) DEFAULT 'expire',
 ` + "`quota_reset_period`" + ` varchar(16) DEFAULT 'never',
 ` + "`quota_reset_custom_seconds`" + ` bigint DEFAULT 0,
 ` + "`created_at`" + ` bigint,
@@ -635,6 +646,9 @@ PRIMARY KEY (` + "`id`" + `)
 		{Name: "upgrade_group", DDL: "`upgrade_group` varchar(64) DEFAULT ''"},
 		{Name: "downgrade_group", DDL: "`downgrade_group` varchar(64) DEFAULT ''"},
 		{Name: "total_amount", DDL: "`total_amount` bigint NOT NULL DEFAULT 0"},
+		{Name: "quota_grant_mode", DDL: "`quota_grant_mode` varchar(16) DEFAULT 'full'"},
+		{Name: "daily_amount", DDL: "`daily_amount` bigint DEFAULT 0"},
+		{Name: "quota_expiry_policy", DDL: "`quota_expiry_policy` varchar(16) DEFAULT 'expire'"},
 		{Name: "quota_reset_period", DDL: "`quota_reset_period` varchar(16) DEFAULT 'never'"},
 		{Name: "quota_reset_custom_seconds", DDL: "`quota_reset_custom_seconds` bigint DEFAULT 0"},
 		{Name: "created_at", DDL: "`created_at` bigint"},

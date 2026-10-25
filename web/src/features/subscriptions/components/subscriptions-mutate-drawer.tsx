@@ -145,6 +145,8 @@ export function SubscriptionsMutateDrawer({
 
   const durationUnit = form.watch('duration_unit')
   const resetPeriod = form.watch('quota_reset_period')
+  const quotaGrantMode = form.watch('quota_grant_mode')
+  const isDailyPlan = quotaGrantMode === 'daily'
   // Gate "+ Create on Pancake" on the same checks the mint handler runs.
   const watchedTitle = form.watch('title')
   const watchedPrice = form.watch('price_amount')
@@ -353,7 +355,13 @@ export function SubscriptionsMutateDrawer({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        {t('Quota ({{currency}})', { currency: currencyLabel })}
+                        {isDailyPlan
+                          ? t('Lifetime quota cap ({{currency}})', {
+                              currency: currencyLabel,
+                            })
+                          : t('Quota ({{currency}})', {
+                              currency: currencyLabel,
+                            })}
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -375,16 +383,135 @@ export function SubscriptionsMutateDrawer({
                           }
                         />
                       </FormControl>
-                      <FormDescription>
-                        {t(
-                          'Total quota included in the plan, usable per billing period. 0 means unlimited.'
-                        )}
-                      </FormDescription>
+                      {!isDailyPlan && (
+                        <FormDescription>
+                          {t(
+                            'Total quota included in the plan, usable per billing period. 0 means unlimited.'
+                          )}
+                        </FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                <FormField
+                  control={form.control}
+                  name='quota_grant_mode'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Quota Allocation')}</FormLabel>
+                      <Select
+                        items={[
+                          { value: 'full', label: t('Full quota') },
+                          { value: 'daily', label: t('Daily accrual') },
+                        ]}
+                        onValueChange={(value) => {
+                          field.onChange(value)
+                          if (value === 'daily') {
+                            form.setValue('quota_reset_period', 'never')
+                          }
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent alignItemWithTrigger={false}>
+                          <SelectGroup>
+                            <SelectItem value='full'>
+                              {t('Full quota')}
+                            </SelectItem>
+                            <SelectItem value='daily'>
+                              {t('Daily accrual')}
+                            </SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {isDailyPlan && (
+                  <FormField
+                    control={form.control}
+                    name='daily_amount'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t('Daily amount ({{currency}})', {
+                            currency: currencyLabel,
+                          })}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min={0}
+                            step={tokensOnly ? 1 : 0.01}
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseFloat(e.target.value) || 0
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              {isDailyPlan && (
+                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='quota_expiry_policy'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Quota expiry')}</FormLabel>
+                        <Select
+                          items={[
+                            {
+                              value: 'expire',
+                              label: t('Expires with subscription'),
+                            },
+                            {
+                              value: 'retain',
+                              label: t('Retain earned balance'),
+                            },
+                          ]}
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent alignItemWithTrigger={false}>
+                            <SelectGroup>
+                              <SelectItem value='expire'>
+                                {t('Expires with subscription')}
+                              </SelectItem>
+                              <SelectItem value='retain'>
+                                {t('Retain earned balance')}
+                              </SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
                 <FormField
@@ -684,65 +811,72 @@ export function SubscriptionsMutateDrawer({
                 {t('Quota Reset')}
               </h3>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-                <FormField
-                  control={form.control}
-                  name='quota_reset_period'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Reset Cycle')}</FormLabel>
-                      <Select
-                        items={resetPeriodOpts.map((o) => ({
-                          value: o.value,
-                          label: o.label,
-                        }))}
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectGroup>
-                            {resetPeriodOpts.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {!isDailyPlan && (
+                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='quota_reset_period'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Reset Cycle')}</FormLabel>
+                        <Select
+                          items={resetPeriodOpts.map((o) => ({
+                            value: o.value,
+                            label: o.label,
+                          }))}
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent alignItemWithTrigger={false}>
+                            <SelectGroup>
+                              {resetPeriodOpts.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name='quota_reset_custom_seconds'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Custom Seconds')}</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type='number'
-                          min={0}
-                          disabled={resetPeriod !== 'custom'}
-                          onChange={(e) =>
-                            field.onChange(
-                              Number.parseInt(e.target.value, 10) || 0
-                            )
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                  <FormField
+                    control={form.control}
+                    name='quota_reset_custom_seconds'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Custom Seconds')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min={0}
+                            disabled={resetPeriod !== 'custom'}
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseInt(e.target.value, 10) || 0
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              {isDailyPlan && (
+                <FormDescription>
+                  {t('Daily plans use no reset cycle')}
+                </FormDescription>
+              )}
             </SideDrawerSection>
 
             {/* Payment Config */}

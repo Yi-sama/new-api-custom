@@ -33,6 +33,9 @@ export const subscriptionPlanSchema = z.object({
   custom_seconds: z.number().optional(),
   quota_reset_period: z.enum(['never', 'daily', 'weekly', 'monthly', 'custom']),
   quota_reset_custom_seconds: z.number().optional(),
+  quota_grant_mode: z.enum(['full', 'daily']).default('full'),
+  daily_amount: z.number().default(0),
+  quota_expiry_policy: z.enum(['expire', 'retain']).default('expire'),
   enabled: z.boolean(),
   sort_order: z.number(),
   allow_balance_pay: z.boolean().optional().default(true),
@@ -66,6 +69,11 @@ export const userSubscriptionSchema = z.object({
   end_time: z.number(),
   amount_total: z.number(),
   amount_used: z.number(),
+  quota_grant_mode: z.enum(['full', 'daily']).default('full'),
+  daily_amount: z.number().default(0),
+  quota_expiry_policy: z.enum(['expire', 'retain']).default('expire'),
+  amount_granted: z.number().optional(),
+  next_grant_time: z.number().optional(),
   next_reset_time: z.number().optional(),
 })
 

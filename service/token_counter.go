@@ -176,9 +176,9 @@ func getImageToken(c *gin.Context, fileMeta *types.FileMeta, model string, strea
 	return tiles*tileTokens + baseTokens, nil
 }
 
-func EstimateRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relaycommon.RelayInfo) (int, error) {
+func EstimateRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relaycommon.RelayInfo, force ...bool) (int, error) {
 	// 是否统计token
-	if !constant.CountToken {
+	if !constant.CountToken && !(len(force) > 0 && force[0]) {
 		return 0, nil
 	}
 

@@ -98,6 +98,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
     selectedEpayMethod ||
     t('Select payment method')
   const totalAmount = Number(plan.total_amount || 0)
+  const isDailyPlan = plan.quota_grant_mode === 'daily'
   const price = Number(plan.price_amount || 0).toFixed(2)
   const quotaPerUnit =
     currency?.quotaPerUnit && currency.quotaPerUnit > 0
@@ -289,7 +290,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
               {formatDuration(plan, t)}
             </span>
           </div>
-          {formatResetPeriod(plan, t) !== t('No Reset') && (
+          {!isDailyPlan && formatResetPeriod(plan, t) !== t('No Reset') && (
             <div className='flex justify-between'>
               <span className='text-muted-foreground text-sm'>
                 {t('Reset Period')}
@@ -299,13 +300,41 @@ export function SubscriptionPurchaseDialog(props: Props) {
           )}
           <div className='flex items-center justify-between'>
             <span className='text-muted-foreground text-sm'>
-              {t('Plan Quota')}
+              {isDailyPlan ? t('Lifetime quota cap') : t('Plan Quota')}
             </span>
             <span className='flex items-center gap-1 text-sm'>
               <Package className='h-3.5 w-3.5' />
               {totalAmount > 0 ? formatQuota(totalAmount) : t('Unlimited')}
             </span>
           </div>
+          {isDailyPlan && (
+            <>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Quota Allocation')}
+                </span>
+                <span className='text-sm'>{t('Daily accrual')}</span>
+              </div>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Daily amount')}
+                </span>
+                <span className='text-sm'>
+                  {formatQuota(Number(plan.daily_amount || 0))}
+                </span>
+              </div>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Quota expiry')}
+                </span>
+                <span className='text-sm'>
+                  {plan.quota_expiry_policy === 'retain'
+                    ? t('Retain earned balance')
+                    : t('Expires with subscription')}
+                </span>
+              </div>
+            </>
+          )}
           {plan.upgrade_group && (
             <div className='flex items-center justify-between'>
               <span className='text-muted-foreground text-sm'>
@@ -405,12 +434,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
             {hasEpay && (
               <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
                 <Select
-                  items={[
-                    ...(props.epayMethods || []).map((m) => ({
-                      value: m.type,
-                      label: m.name || m.type,
-                    })),
-                  ]}
+                  items={(props.epayMethods || []).map((m) => ({
+                    value: m.type,
+                    label: m.name || m.type,
+                  }))}
                   value={selectedEpayMethod}
                   onValueChange={(v) => v !== null && setSelectedEpayMethod(v)}
                   disabled={limitReached}

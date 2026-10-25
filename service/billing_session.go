@@ -51,9 +51,21 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		return nil
 	}
 	// 1) 调整资金来源（仅在尚未提交时执行，防止重复调用）
+	resizedSubscription := false
 	if !s.fundingSettled {
-		if err := s.funding.Settle(delta); err != nil {
-			return err
+		if sub, ok := s.funding.(*SubscriptionFunding); ok {
+			allowWallet := common.NormalizeBillingPreference(s.relayInfo.UserSetting.BillingPreference) != "subscription_only"
+			funding, err := sub.resize(actualQuota, allowWallet, true)
+			if err != nil {
+				return err
+			}
+			s.funding = funding
+			s.syncRelayInfo()
+			resizedSubscription = true
+		} else {
+			if err := s.funding.Settle(delta); err != nil {
+				return err
+			}
 		}
 		s.fundingSettled = true
 	}
@@ -72,7 +84,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		}
 	}
 	// 3) 更新 relayInfo 上的订阅 PostDelta（用于日志）
-	if s.funding.Source() == BillingSourceSubscription {
+	if s.funding.Source() == BillingSourceSubscription && !resizedSubscription {
 		s.relayInfo.SubscriptionPostDelta += int64(delta)
 	}
 	s.settled = true
@@ -166,6 +178,32 @@ func (s *BillingSession) Reserve(targetQuota int) error {
 
 	delta := targetQuota - s.preConsumedQuota
 	if delta <= 0 {
+		return nil
+	}
+
+	if sub, ok := s.funding.(*SubscriptionFunding); ok {
+		// Check the token before migrating the funding reservation.
+		if err := s.reserveToken(delta); err != nil {
+			return err
+		}
+		allowWallet := common.NormalizeBillingPreference(s.relayInfo.UserSetting.BillingPreference) != "subscription_only"
+		funding, err := sub.resize(targetQuota, allowWallet, false)
+		if err != nil {
+			if !s.relayInfo.IsPlayground {
+				if refundErr := model.IncreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, delta); refundErr != nil {
+					common.SysError("error rolling back rollover token reservation: " + refundErr.Error())
+				}
+			}
+			if errors.Is(err, model.ErrSubscriptionFundingInsufficient) {
+				return types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
+			return err
+		}
+		s.funding = funding
+		s.preConsumedQuota = targetQuota
+		s.tokenConsumed += delta
+		s.extraReserved = 0
+		s.syncRelayInfo()
 		return nil
 	}
 

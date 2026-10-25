@@ -90,6 +90,7 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
               ![
                 '/system-settings/operations/auto-model',
                 '/system-settings/operations/fast-mode',
+                '/system-settings/operations/daily-token-pool',
                 '/system-settings/operations/niko-group-sync',
                 '/system-settings/operations/channel-health',
                 '/system-settings/operations/channel-status',
@@ -102,6 +103,10 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
           title: '额外设置',
           icon: RefreshCw,
           items: [
+            {
+              title: t('Daily shared token pool'),
+              url: '/system-settings/operations/daily-token-pool',
+            },
             {
               title: 'Auto 默认设置',
               url: '/system-settings/operations/auto-model',

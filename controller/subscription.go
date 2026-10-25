@@ -138,6 +138,52 @@ type AdminUpsertSubscriptionPlanRequest struct {
 	Plan model.SubscriptionPlan `json:"plan"`
 }
 
+func normalizeSubscriptionPlanQuotaSettings(plan *model.SubscriptionPlan) error {
+	mode := strings.TrimSpace(plan.QuotaGrantMode)
+	if mode == "" {
+		mode = model.SubscriptionQuotaGrantFull
+	}
+	if mode != model.SubscriptionQuotaGrantFull && mode != model.SubscriptionQuotaGrantDaily {
+		return fmt.Errorf("额度发放方式无效")
+	}
+	policy := strings.TrimSpace(plan.QuotaExpiryPolicy)
+	if policy == "" {
+		policy = model.SubscriptionQuotaExpiryExpire
+	}
+	if policy != model.SubscriptionQuotaExpiryExpire && policy != model.SubscriptionQuotaExpiryRetain {
+		return fmt.Errorf("额度到期策略无效")
+	}
+	period := strings.TrimSpace(plan.QuotaResetPeriod)
+	if period == "" {
+		period = model.SubscriptionResetNever
+	}
+	if period != model.SubscriptionResetNever && period != model.SubscriptionResetDaily &&
+		period != model.SubscriptionResetWeekly && period != model.SubscriptionResetMonthly &&
+		period != model.SubscriptionResetCustom {
+		return fmt.Errorf("额度重置周期无效")
+	}
+	plan.QuotaGrantMode = mode
+	plan.QuotaExpiryPolicy = policy
+	plan.QuotaResetPeriod = period
+	if mode == model.SubscriptionQuotaGrantDaily {
+		if plan.TotalAmount <= 0 || plan.TotalAmount > common.MaxWalletQuota {
+			return fmt.Errorf("每日发放套餐总额度必须在1到%d之间", common.MaxWalletQuota)
+		}
+		if plan.DailyAmount <= 0 || plan.DailyAmount > common.MaxWalletQuota {
+			return fmt.Errorf("每日发放额度必须在1到%d之间", common.MaxWalletQuota)
+		}
+		plan.QuotaResetPeriod = model.SubscriptionResetNever
+		plan.QuotaResetCustomSeconds = 0
+		return nil
+	}
+	plan.DailyAmount = 0
+	plan.QuotaExpiryPolicy = model.SubscriptionQuotaExpiryExpire
+	if plan.QuotaResetPeriod == model.SubscriptionResetCustom && plan.QuotaResetCustomSeconds <= 0 {
+		return fmt.Errorf("自定义重置周期需大于0秒")
+	}
+	return nil
+}
+
 func AdminCreateSubscriptionPlan(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
 		return
@@ -199,9 +245,8 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 			return
 		}
 	}
-	req.Plan.QuotaResetPeriod = model.NormalizeResetPeriod(req.Plan.QuotaResetPeriod)
-	if req.Plan.QuotaResetPeriod == model.SubscriptionResetCustom && req.Plan.QuotaResetCustomSeconds <= 0 {
-		common.ApiErrorMsg(c, "自定义重置周期需大于0秒")
+	if err := normalizeSubscriptionPlanQuotaSettings(&req.Plan); err != nil {
+		common.ApiErrorMsg(c, err.Error())
 		return
 	}
 	err := model.DB.Create(&req.Plan).Error
@@ -273,9 +318,8 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			return
 		}
 	}
-	req.Plan.QuotaResetPeriod = model.NormalizeResetPeriod(req.Plan.QuotaResetPeriod)
-	if req.Plan.QuotaResetPeriod == model.SubscriptionResetCustom && req.Plan.QuotaResetCustomSeconds <= 0 {
-		common.ApiErrorMsg(c, "自定义重置周期需大于0秒")
+	if err := normalizeSubscriptionPlanQuotaSettings(&req.Plan); err != nil {
+		common.ApiErrorMsg(c, err.Error())
 		return
 	}
 
@@ -296,6 +340,9 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"waffo_pancake_product_id":   req.Plan.WaffoPancakeProductId,
 			"max_purchase_per_user":      req.Plan.MaxPurchasePerUser,
 			"total_amount":               req.Plan.TotalAmount,
+			"quota_grant_mode":           req.Plan.QuotaGrantMode,
+			"daily_amount":               req.Plan.DailyAmount,
+			"quota_expiry_policy":        req.Plan.QuotaExpiryPolicy,
 			"upgrade_group":              req.Plan.UpgradeGroup,
 			"downgrade_group":            req.Plan.DowngradeGroup,
 			"quota_reset_period":         req.Plan.QuotaResetPeriod,

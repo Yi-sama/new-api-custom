@@ -79,13 +79,15 @@ export function filterByQuotaType(
 ): PricingModel[] {
   if (quotaType === QUOTA_TYPES.ALL) return models
   if (quotaType === QUOTA_TYPES.SECOND) {
-    return models.filter((model) => Boolean(model.video_pricing))
+    return models.filter((model) => model.video_pricing?.unit === 'second')
   }
   const targetType =
     quotaType === QUOTA_TYPES.TOKEN
       ? QUOTA_TYPE_VALUES.TOKEN
       : QUOTA_TYPE_VALUES.REQUEST
-  return models.filter((m) => m.quota_type === targetType && !m.video_pricing)
+  return models.filter(
+    (m) => m.quota_type === targetType && m.video_pricing?.unit !== 'second'
+  )
 }
 
 /**

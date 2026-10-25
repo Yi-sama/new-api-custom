@@ -118,6 +118,24 @@ func (s *SubscriptionFunding) Settle(delta int) error {
 	return model.PostConsumeUserSubscriptionDelta(s.subscriptionId, int64(delta))
 }
 
+func (s *SubscriptionFunding) resize(amount int, allowWallet, settling bool) (FundingSource, error) {
+	res, err := model.ResizeSubscriptionPreConsume(s.requestId, s.userId, int64(amount), allowWallet, settling)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return &WalletFunding{userId: s.userId, consumed: amount}, nil
+	}
+	s.subscriptionId = res.UserSubscriptionId
+	s.preConsumed = res.PreConsumed
+	s.AmountTotal = res.AmountTotal
+	s.AmountUsedAfter = res.AmountUsedAfter
+	if plan, err := model.GetSubscriptionPlanInfoByUserSubscriptionId(s.subscriptionId); err == nil && plan != nil {
+		s.PlanId, s.PlanTitle = plan.PlanId, plan.PlanTitle
+	}
+	return s, nil
+}
+
 func (s *SubscriptionFunding) Refund() error {
 	if s.preConsumed <= 0 {
 		return nil

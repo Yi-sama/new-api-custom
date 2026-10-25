@@ -81,21 +81,23 @@ type TokenCountMeta struct {
 }
 
 type RelayInfo struct {
-	TokenId           int
-	TokenKey          string
-	TokenGroup        string
-	UserId            int
-	UsingGroup        string // 使用的分组，当auto跨分组重试时，会变动
-	UserGroup         string // 用户所在分组
-	TokenUnlimited    bool
-	TokenFastMode     bool
-	FastMode          bool
-	FastModeRequested bool
-	FastModeTier      string
-	FastModeProtocol  string
-	StartTime         time.Time
-	FirstResponseTime time.Time
-	isFirstResponse   bool
+	DailyTokenPoolReservationID string
+	DailyTokenPoolFree          bool
+	TokenId                     int
+	TokenKey                    string
+	TokenGroup                  string
+	UserId                      int
+	UsingGroup                  string // 使用的分组，当auto跨分组重试时，会变动
+	UserGroup                   string // 用户所在分组
+	TokenUnlimited              bool
+	TokenFastMode               bool
+	FastMode                    bool
+	FastModeRequested           bool
+	FastModeTier                string
+	FastModeProtocol            string
+	StartTime                   time.Time
+	FirstResponseTime           time.Time
+	isFirstResponse             bool
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
