@@ -615,7 +615,8 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 		request.Model = originModel
 	}
 	if info != nil && request.Reasoning != nil && request.Reasoning.Effort != "" {
-		info.SetReasoningEffort(request.Reasoning.Effort)
+		info.SetReasoningEffort(relaycommon.NormalizeResponsesReasoningEffort(
+			request.Reasoning.Effort, request.Reasoning.Context))
 	}
 	return request, nil
 }

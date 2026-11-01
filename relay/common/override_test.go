@@ -2438,6 +2438,14 @@ func TestApplyParamOverrideWithRelayInfoSynchronizesReasoningEffort(t *testing.T
 			expected:      "max",
 		},
 		{
+			name:          "Responses Ultra context",
+			relayFormat:   types.RelayFormatOpenAIResponses,
+			initialEffort: "max",
+			input:         `{"reasoning":{"effort":"max","context":"all_turns"}}`,
+			operation:     map[string]interface{}{"mode": "set", "path": "reasoning.effort", "value": "max"},
+			expected:      "ultra",
+		},
+		{
 			name:          "chat delete",
 			relayFormat:   types.RelayFormatOpenAI,
 			initialEffort: "high",

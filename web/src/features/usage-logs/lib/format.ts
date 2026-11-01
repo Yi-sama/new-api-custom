@@ -171,6 +171,7 @@ export function getReasoningEffortVariant(
   effort: string | undefined
 ): StatusBadgeProps['variant'] {
   switch (effort?.trim().toLowerCase()) {
+    case 'ultra':
     case 'max':
     case 'xhigh':
     case 'high':
@@ -184,6 +185,11 @@ export function getReasoningEffortVariant(
     default:
       return 'grey'
   }
+}
+
+export function formatReasoningEffort(effort: string | undefined): string {
+  if (effort?.trim().toLowerCase() === 'ultra') return 'Ultra'
+  return effort ?? ''
 }
 
 /**

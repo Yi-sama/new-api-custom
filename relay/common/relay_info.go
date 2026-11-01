@@ -453,6 +453,22 @@ func GenRelayInfoOpenAI(c *gin.Context, request dto.Request) *RelayInfo {
 	return info
 }
 
+// NormalizeResponsesReasoningEffort preserves the local Ultra level used by
+// Codex-compatible clients. On the wire, Ultra is represented as max together
+// with reasoning.context=all_turns.
+func NormalizeResponsesReasoningEffort(effort string, context []byte) string {
+	effort = strings.TrimSpace(effort)
+	if !strings.EqualFold(effort, "max") || len(context) == 0 {
+		return effort
+	}
+	contextValue := gjson.ParseBytes(context)
+	if contextValue.Type == gjson.String &&
+		strings.EqualFold(strings.TrimSpace(contextValue.String()), "all_turns") {
+		return "ultra"
+	}
+	return effort
+}
+
 func reasoningEffortFromRequest(request dto.Request) string {
 	var effort string
 	switch req := request.(type) {
@@ -469,7 +485,7 @@ func reasoningEffortFromRequest(request dto.Request) string {
 		}
 	case *dto.OpenAIResponsesRequest:
 		if req != nil && req.Reasoning != nil {
-			effort = req.Reasoning.Effort
+			return NormalizeResponsesReasoningEffort(req.Reasoning.Effort, req.Reasoning.Context)
 		}
 	case *dto.ClaudeRequest:
 		if req != nil {

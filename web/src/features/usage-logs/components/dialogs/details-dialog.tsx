@@ -75,6 +75,7 @@ import {
   getFirstResponseTimeColor,
   getResponseTimeColor,
   getReasoningEffortVariant,
+  formatReasoningEffort,
   renderAuditContent,
 } from '../../lib/format'
 import {
@@ -1047,7 +1048,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
             label={t('Reasoning Effort')}
             value={
               <StatusBadge
-                label={other.reasoning_effort}
+                label={formatReasoningEffort(other.reasoning_effort)}
                 variant={reasoningEffortVariant}
                 size='sm'
                 copyable={false}

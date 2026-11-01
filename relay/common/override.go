@@ -248,7 +248,12 @@ func extractReasoningEffortFromJSON(format types.RelayFormat, data []byte) (stri
 		if value.Type != gjson.String {
 			return "", true
 		}
-		return strings.TrimSpace(value.String()), true
+		effort := strings.TrimSpace(value.String())
+		if format == types.RelayFormatOpenAI || format == types.RelayFormatOpenAIResponses {
+			context := gjson.GetBytes(data, "reasoning.context")
+			effort = NormalizeResponsesReasoningEffort(effort, []byte(context.Raw))
+		}
+		return effort, true
 	}
 	return "", false
 }

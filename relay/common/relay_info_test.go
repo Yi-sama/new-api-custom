@@ -114,6 +114,16 @@ func TestGenRelayInfoCapturesRequestReasoningEffort(t *testing.T) {
 			expected:    "max",
 		},
 		{
+			name:        "OpenAI Responses Ultra context",
+			path:        "/v1/responses",
+			relayFormat: types.RelayFormatOpenAIResponses,
+			request: &dto.OpenAIResponsesRequest{
+				Model:     "gpt-5.6-sol",
+				Reasoning: &dto.Reasoning{Effort: "max", Context: json.RawMessage(`"all_turns"`)},
+			},
+			expected: "ultra",
+		},
+		{
 			name:        "explicit none is preserved",
 			path:        "/v1/responses",
 			relayFormat: types.RelayFormatOpenAIResponses,
