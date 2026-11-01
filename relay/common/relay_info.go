@@ -251,6 +251,7 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 		info.ReasoningEffort = ""
 	} else {
 		info.ReasoningEffort = reasoningEffortFromRequest(info.Request)
+		info.ReasoningEffort = normalizeReasoningEffortFromHeaders(info.ReasoningEffort, info.RequestHeaders)
 	}
 
 	// reset some fields based on channel meta
@@ -469,6 +470,25 @@ func NormalizeResponsesReasoningEffort(effort string, context []byte) string {
 	return effort
 }
 
+func normalizeReasoningEffortFromHeaders(effort string, headers map[string]string) string {
+	effort = strings.TrimSpace(effort)
+	for key, value := range headers {
+		if !strings.EqualFold(key, "X-Codex-Turn-Metadata") {
+			continue
+		}
+		headerEffort := gjson.Get(value, "reasoning_effort")
+		if headerEffort.Type != gjson.String {
+			continue
+		}
+		headerEffortValue := strings.TrimSpace(headerEffort.String())
+		if strings.EqualFold(headerEffortValue, "ultra") &&
+			(strings.EqualFold(effort, "max") || effort == "") {
+			return "ultra"
+		}
+	}
+	return effort
+}
+
 func reasoningEffortFromRequest(request dto.Request) string {
 	var effort string
 	switch req := request.(type) {
@@ -530,6 +550,7 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		reqId = common.NewRequestId()
 	}
 	reasoningEffort := reasoningEffortFromRequest(request)
+	reasoningEffort = normalizeReasoningEffortFromHeaders(reasoningEffort, cloneRequestHeaders(c))
 	info := &RelayInfo{
 		Request:         request,
 		ReasoningEffort: reasoningEffort,

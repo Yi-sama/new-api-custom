@@ -2427,6 +2427,7 @@ func TestApplyParamOverrideWithRelayInfoSynchronizesReasoningEffort(t *testing.T
 		initialEffort string
 		input         string
 		operation     map[string]interface{}
+		headers       map[string]string
 		expected      string
 	}{
 		{
@@ -2443,6 +2444,15 @@ func TestApplyParamOverrideWithRelayInfoSynchronizesReasoningEffort(t *testing.T
 			initialEffort: "max",
 			input:         `{"reasoning":{"effort":"max","context":"all_turns"}}`,
 			operation:     map[string]interface{}{"mode": "set", "path": "reasoning.effort", "value": "max"},
+			expected:      "ultra",
+		},
+		{
+			name:          "Codex Ultra metadata survives override",
+			relayFormat:   types.RelayFormatOpenAIResponses,
+			initialEffort: "ultra",
+			input:         `{"reasoning":{"effort":"max"}}`,
+			operation:     map[string]interface{}{"mode": "set", "path": "reasoning.effort", "value": "max"},
+			headers:       map[string]string{"X-Codex-Turn-Metadata": `{"reasoning_effort":"ultra"}`},
 			expected:      "ultra",
 		},
 		{
@@ -2500,6 +2510,7 @@ func TestApplyParamOverrideWithRelayInfoSynchronizesReasoningEffort(t *testing.T
 			info := &RelayInfo{
 				RelayFormat:     tt.relayFormat,
 				ReasoningEffort: tt.initialEffort,
+				RequestHeaders:  tt.headers,
 				ChannelMeta: &ChannelMeta{ParamOverride: map[string]interface{}{
 					"operations": []interface{}{tt.operation},
 				}},

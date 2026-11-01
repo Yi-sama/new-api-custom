@@ -215,6 +215,7 @@ func syncReasoningEffortAfterParamOverride(info *RelayInfo, before, after []byte
 	_, existedBefore := extractReasoningEffortFromJSON(info.GetFinalRequestRelayFormat(), before)
 	effort, existsAfter := extractReasoningEffortFromJSON(info.GetFinalRequestRelayFormat(), after)
 	if existsAfter {
+		effort = normalizeReasoningEffortFromHeaders(effort, info.RequestHeaders)
 		info.SetReasoningEffort(effort)
 		return
 	}
