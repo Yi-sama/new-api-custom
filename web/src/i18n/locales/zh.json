@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Group display names": "分组显示名",
+    "Expected a JSON object mapping group identifiers to display names": "请输入分组标识到显示名的 JSON 字符串映射",
     "QQ Binding": "QQ 绑定",
     "Bind QQ": "绑定 QQ",
     "QQ Number": "QQ 号",

@@ -69,6 +69,7 @@ type GroupFormValues = {
   GroupRatioAddition: string
   TopupGroupRatio: string
   UserUsableGroups: string
+  GroupDisplayNames: string
   GroupGroupRatio: string
   AutoGroups: string
   MaxTokenAutoGroups: number
@@ -165,6 +166,29 @@ export const GroupRatioForm = memo(function GroupRatioForm({
             {isSaving ? t('Saving...') : t('Save group ratios')}
           </Button>
         </SettingsPageActionsPortal>
+        <FormField
+          control={form.control}
+          name='GroupDisplayNames'
+          render={({ field, fieldState }) => (
+            <FormItem data-invalid={fieldState.invalid}>
+              <FormLabel>{t('Group display names')}</FormLabel>
+              <FormControl>
+                <JsonCodeEditor
+                  value={field.value}
+                  onChange={field.onChange}
+                  name={field.name}
+                  onBlur={field.onBlur}
+                  textareaRef={field.ref}
+                  ariaLabel={t('Group display names')}
+                  aria-invalid={fieldState.invalid}
+                  disabled={isSaving}
+                  heightClassName='h-40 min-h-40 max-h-40'
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         {editMode === 'visual' ? (
           <div className='space-y-6'>
             <GroupRatioVisualEditor

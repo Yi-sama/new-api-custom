@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Group display names": "Group display names",
+    "Expected a JSON object mapping group identifiers to display names": "Expected a JSON object mapping group identifiers to display names",
     "QQ Binding": "QQ Binding",
     "Bind QQ": "Bind QQ",
     "QQ Number": "QQ Number",
