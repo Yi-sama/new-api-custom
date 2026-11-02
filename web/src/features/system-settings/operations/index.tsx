@@ -60,6 +60,7 @@ const defaultOperationsSettings: OperationsSettings = {
   ChannelStatusConfig: '',
   AutoModelDefaultModels: [],
   FastModeAllowedGroups: [],
+  GroupDisplayNames: '{}',
 }
 
 export function OperationsSettings() {

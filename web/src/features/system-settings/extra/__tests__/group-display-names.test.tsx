@@ -24,15 +24,19 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
+import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 
-import { SettingsPageProvider } from '../../components/settings-page-context'
-import { RatioSettingsCard } from '../ratio-settings-card'
+import { GroupDisplayNamesSettings } from '../group-display-names'
+
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-router')>()),
+  useBlocker: () => ({ status: 'idle' }),
+}))
 
 const put = vi.fn<typeof api.put>()
-const actions = document.createElement('div')
 let queryClient: QueryClient
 
 function renderSettings(names = '{}') {
@@ -42,40 +46,9 @@ function renderSettings(names = '{}') {
       mutations: { retry: false },
     },
   })
-  document.body.append(actions)
   return render(
     <QueryClientProvider client={queryClient}>
-      <SettingsPageProvider actionsContainer={actions}>
-        <RatioSettingsCard
-          visibleTabs={['groups']}
-          modelDefaults={{
-            ModelPrice: '{}',
-            ModelRatio: '{}',
-            CacheRatio: '{}',
-            CreateCacheRatio: '{}',
-            CompletionRatio: '{}',
-            ImageRatio: '{}',
-            AudioRatio: '{}',
-            AudioCompletionRatio: '{}',
-            ExposeRatioEnabled: false,
-            BillingMode: '{}',
-            BillingExpr: '{}',
-          }}
-          groupDefaults={{
-            GroupRatio: '{"default":0.2}',
-            GroupRatioAddition: '{}',
-            TopupGroupRatio: '{}',
-            UserUsableGroups: '{"default":"Testing"}',
-            GroupDisplayNames: names,
-            GroupGroupRatio: '{}',
-            AutoGroups: '["default"]',
-            MaxTokenAutoGroups: 5,
-            DefaultUseAutoGroup: false,
-            GroupSpecialUsableGroup: '{}',
-          }}
-          toolPricesDefault='{}'
-        />
-      </SettingsPageProvider>
+      <GroupDisplayNamesSettings GroupDisplayNames={names} />
     </QueryClientProvider>
   )
 }
@@ -89,30 +62,33 @@ function editNames(value: string) {
   )
 }
 
-function saveNames() {
-  fireEvent.click(screen.getByRole('button', { name: 'Save group ratios' }))
+async function saveNames() {
+  const button = screen.getByRole('button', { name: 'Save changes' })
+  await waitFor(() => expect(button).toBeEnabled())
+  fireEvent.click(button)
 }
 
 beforeEach(() => {
   vi.spyOn(api, 'put').mockImplementation(put)
+  vi.spyOn(toast, 'error').mockImplementation(() => '')
+  vi.spyOn(toast, 'success').mockImplementation(() => '')
   put.mockResolvedValue({ data: { success: true, message: '' } })
 })
 
 afterEach(() => {
   cleanup()
   queryClient?.clear()
-  actions.replaceChildren()
-  actions.remove()
 })
 
-describe('group display names in billing settings', () => {
+describe('group display names in extra settings', () => {
   test('loads saved names and saves only the display mapping without renaming groups', async () => {
     renderSettings('{"default":"GPT"}')
     const editor = screen.getByRole('textbox', { name: 'Group display names' })
     expect(editor).toHaveValue('{\n  "default": "GPT"\n}')
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
 
     editNames('{"default":"Claude","auto":"All"}')
-    saveNames()
+    await saveNames()
 
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1))
     expect(put).toHaveBeenCalledWith('/api/option/', {
@@ -121,25 +97,34 @@ describe('group display names in billing settings', () => {
     })
   })
 
-  test('keeps the same mapping when switching between visual and JSON modes', () => {
-    renderSettings()
-    editNames('{"default":"GPT"}')
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to JSON' }))
+  test('reset discards edits and restores the saved display mapping', async () => {
+    renderSettings('{"default":"GPT"}')
+    editNames('{"default":"Claude"}')
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Reset' })).toBeEnabled()
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     expect(
       screen.getByRole('textbox', { name: 'Group display names' })
-    ).toHaveValue('{"default":"GPT"}')
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to Visual' }))
-    expect(
-      screen.getByRole('textbox', { name: 'Group display names' })
-    ).toHaveValue('{"default":"GPT"}')
+    ).toHaveValue('{\n  "default": "GPT"\n}')
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+    expect(put).not.toHaveBeenCalled()
   })
 
-  test.each(['null', '[]', '{"default":1}', '{"default":null}', '{" ":"GPT"}'])(
+  test.each([
+    '',
+    '{',
+    'null',
+    '[]',
+    '{"default":1}',
+    '{"default":null}',
+    '{" ":"GPT"}',
+  ])(
     'rejects invalid display mapping %s before contacting the server',
     async (value) => {
       renderSettings()
       editNames(value)
-      saveNames()
+      await saveNames()
 
       await waitFor(() =>
         expect(
@@ -158,7 +143,7 @@ describe('group display names in billing settings', () => {
   test('saves an empty object to remove all custom display names', async () => {
     renderSettings('{"default":"GPT"}')
     editNames('{}')
-    saveNames()
+    await saveNames()
     await waitFor(() =>
       expect(put).toHaveBeenCalledWith('/api/option/', {
         key: 'GroupDisplayNames',
@@ -173,14 +158,39 @@ describe('group display names in billing settings', () => {
     })
     renderSettings()
     editNames('{"default":"GPT"}')
-    saveNames()
-    await waitFor(() => expect(put).toHaveBeenCalledTimes(1))
+    await saveNames()
     await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Save group ratios' })
-      ).toBeEnabled()
+      expect(toast.error).toHaveBeenCalledWith('Saving failed')
     )
-    saveNames()
+    expect(
+      screen.getByRole('textbox', { name: 'Group display names' })
+    ).toHaveValue('{"default":"GPT"}')
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    )
+    await saveNames()
     await waitFor(() => expect(put).toHaveBeenCalledTimes(2))
+  })
+
+  test('disables editing while saving and marks a successful save as clean', async () => {
+    let complete!: (response: { data: { success: boolean } }) => void
+    put.mockReturnValueOnce(
+      new Promise((resolve) => {
+        complete = resolve
+      })
+    )
+    renderSettings()
+    editNames('{"default":"GPT"}')
+    await saveNames()
+
+    const editor = screen.getByRole('textbox', { name: 'Group display names' })
+    await waitFor(() => expect(editor).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled()
+
+    complete({ data: { success: true } })
+    await waitFor(() => expect(editor).toBeEnabled())
+    expect(editor).toHaveValue('{"default":"GPT"}')
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
   })
 })

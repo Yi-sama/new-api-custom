@@ -4,6 +4,24 @@ import { describe, expect, it } from 'vitest'
 import { SYSTEM_SETTINGS_VIEW } from '../system-settings.config'
 
 describe('system settings navigation', () => {
+  it('places group display names only under extra settings', () => {
+    const t = ((key: string) => key) as TFunction
+    const items = SYSTEM_SETTINGS_VIEW.getNavGroups(t)[0].items
+    const extra = items.find((item) => item.title === '额外设置')
+    const url = '/system-settings/operations/group-display-names'
+
+    expect(extra?.items).toContainEqual({
+      title: 'Group display names',
+      url,
+    })
+    expect(
+      items
+        .filter((item) => item !== extra)
+        .flatMap((item) => item.items ?? [])
+        .map((item) => item.url)
+    ).not.toContain(url)
+  })
+
   it('places Fast group settings only under extra settings', () => {
     const t = ((key: string) => key) as TFunction
     const items = SYSTEM_SETTINGS_VIEW.getNavGroups(t)[0].items

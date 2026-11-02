@@ -1,8 +1,9 @@
 import { AutoModelSettings } from '../extra/auto-model.tsx'
 import { ChannelHealthSettings } from '../extra/channel-health.tsx'
 import { ChannelStatusSettings } from '../extra/channel-status.tsx'
-import { FastModeSettings } from '../extra/fast-mode'
 import { DailyTokenPoolSettings } from '../extra/daily-token-pool'
+import { FastModeSettings } from '../extra/fast-mode'
+import { GroupDisplayNamesSettings } from '../extra/group-display-names'
 import { InactiveUsersSettings } from '../extra/inactive-users.tsx'
 import { NikoGroupSyncSettings } from '../extra/niko-group-sync.tsx'
 import { StatusImageSettings } from '../extra/status-image'
@@ -164,6 +165,15 @@ const OPERATIONS_SECTIONS = [
     build: (settings: OperationsSettings) => (
       <FastModeSettings
         FastModeAllowedGroups={settings.FastModeAllowedGroups}
+      />
+    ),
+  },
+  {
+    id: 'group-display-names',
+    titleKey: 'Group display names',
+    build: (settings: OperationsSettings) => (
+      <GroupDisplayNamesSettings
+        GroupDisplayNames={settings.GroupDisplayNames}
       />
     ),
   },

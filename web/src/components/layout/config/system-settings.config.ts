@@ -90,6 +90,7 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
               ![
                 '/system-settings/operations/auto-model',
                 '/system-settings/operations/fast-mode',
+                '/system-settings/operations/group-display-names',
                 '/system-settings/operations/daily-token-pool',
                 '/system-settings/operations/niko-group-sync',
                 '/system-settings/operations/channel-health',
@@ -114,6 +115,10 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
             {
               title: t('Fast group settings'),
               url: '/system-settings/operations/fast-mode',
+            },
+            {
+              title: t('Group display names'),
+              url: '/system-settings/operations/group-display-names',
             },
             {
               title: '分组倍率同步',

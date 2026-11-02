@@ -59,7 +59,6 @@ const defaultModelSettings: ModelSettings = {
   GroupRatio: '',
   GroupRatioAddition: '{}',
   UserUsableGroups: '',
-  GroupDisplayNames: '{}',
   GroupGroupRatio: '',
   AutoGroups: '',
   MaxTokenAutoGroups: 5,

@@ -270,7 +270,6 @@ export type ModelSettings = {
   GroupRatio: string
   GroupRatioAddition: string
   UserUsableGroups: string
-  GroupDisplayNames: string
   GroupGroupRatio: string
   AutoGroups: string
   MaxTokenAutoGroups: number
@@ -331,7 +330,6 @@ export type BillingSettings = {
   GroupRatio: string
   GroupRatioAddition: string
   UserUsableGroups: string
-  GroupDisplayNames: string
   GroupGroupRatio: string
   AutoGroups: string
   MaxTokenAutoGroups: number
@@ -422,6 +420,7 @@ export type OperationsSettings = {
   ChannelStatusConfig: string
   AutoModelDefaultModels: string[]
   FastModeAllowedGroups: string[]
+  GroupDisplayNames: string
 }
 
 export type SecuritySettings = {
