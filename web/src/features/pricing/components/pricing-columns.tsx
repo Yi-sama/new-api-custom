@@ -42,6 +42,7 @@ import {
 } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
+import { OfficialPriceComparison } from './official-price-comparison'
 import { VideoPriceSummary } from './video-pricing'
 
 // ----------------------------------------------------------------------------
@@ -95,6 +96,20 @@ export function usePricingColumns(
       minSize: 200,
     },
 
+    // Official reference comparison
+    {
+      id: 'official_comparison',
+      header: t('Official comparison'),
+      cell: ({ row }) => (
+        <OfficialPriceComparison
+          model={row.original}
+          selectedGroup={selectedGroup}
+          priceRate={priceRate}
+        />
+      ),
+      size: 280,
+      enableSorting: false,
+    },
     // Type column
     {
       accessorKey: 'quota_type',

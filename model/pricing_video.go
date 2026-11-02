@@ -8,8 +8,9 @@ import (
 )
 
 type VideoResolutionPrice struct {
-	Resolution     string  `json:"resolution"`
-	PricePerSecond float64 `json:"price_per_second"`
+	Resolution      string  `json:"resolution"`
+	PricePerSecond  float64 `json:"price_per_second,omitempty"`
+	PricePerRequest float64 `json:"price_per_request,omitempty"`
 }
 
 type VideoPricing struct {
@@ -34,7 +35,9 @@ func buildVideoPricing(modelName string, meta *Model) *VideoPricing {
 		return nil
 	}
 	profile := parameters.Video
-	if profile.Currency != "CNY" || profile.BillingUnit != "second" || len(profile.Durations) == 0 {
+	if profile.Currency != "CNY" ||
+		(profile.BillingUnit != "second" && profile.BillingUnit != "request") ||
+		len(profile.Durations) == 0 {
 		return nil
 	}
 	for _, seconds := range profile.Durations {
@@ -58,9 +61,13 @@ func buildVideoPricing(modelName string, meta *Model) *VideoPricing {
 		if !found || price <= 0 || math.IsNaN(price) || math.IsInf(price, 0) {
 			return nil
 		}
-		pricing.Prices = append(pricing.Prices, VideoResolutionPrice{
-			Resolution: resolution, PricePerSecond: price,
-		})
+		entry := VideoResolutionPrice{Resolution: resolution}
+		if profile.BillingUnit == "request" {
+			entry.PricePerRequest = price
+		} else {
+			entry.PricePerSecond = price
+		}
+		pricing.Prices = append(pricing.Prices, entry)
 	}
 	return pricing
 }

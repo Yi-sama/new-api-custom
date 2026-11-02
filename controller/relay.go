@@ -129,6 +129,14 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
 	}
+	defer func() {
+		if newAPIError != nil {
+			service.RefundDailyTokenPool(c, relayInfo)
+		}
+	}()
+	if newAPIError = service.PrepareDailyTokenPoolBilling(c, relayInfo); newAPIError != nil {
+		return
+	}
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
@@ -264,8 +272,18 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			model.ReleaseChannelKey(channel.Id, keyIndex, newAPIError == nil, attemptFirstResponse, time.Since(attemptStart))
 			recordUserChannelStatus(c, relayInfo, channel, newAPIError == nil, time.Since(attemptStart), newAPIError)
 		}
+		if poolBillingErr := service.PrepareDailyTokenPoolBilling(c, relayInfo); poolBillingErr != nil {
+			newAPIError = poolBillingErr
+			releaseAttempt()
+			break
+		}
 		if billingErr := prepareSelectedChannelBilling(c, relayInfo, tokens, meta); billingErr != nil {
 			newAPIError = billingErr
+			releaseAttempt()
+			break
+		}
+		if poolErr := service.ReserveDailyTokenPool(c, relayInfo, channel); poolErr != nil {
+			newAPIError = poolErr
 			releaseAttempt()
 			break
 		}
@@ -301,6 +319,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 		releaseAttempt()
 
+		if newAPIError != nil {
+			service.RefundDailyTokenPool(c, relayInfo)
+		}
 		if newAPIError == nil {
 			relayInfo.LastError = nil
 			return

@@ -24,33 +24,54 @@ import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 import type { SubscriptionPlan, PlanPayload } from '../types'
 
 export function getPlanFormSchema(t: TFunction) {
-  return z.object({
-    title: z.string().min(1, t('Please enter plan title')),
-    subtitle: z.string().optional(),
-    price_amount: z.coerce.number().min(0, t('Please enter amount')),
-    duration_unit: z.enum(['year', 'month', 'day', 'hour', 'custom']),
-    duration_value: z.coerce.number().min(1),
-    custom_seconds: z.coerce.number().min(0).optional(),
-    quota_reset_period: z.enum([
-      'never',
-      'daily',
-      'weekly',
-      'monthly',
-      'custom',
-    ]),
-    quota_reset_custom_seconds: z.coerce.number().min(0).optional(),
-    enabled: z.boolean(),
-    sort_order: z.coerce.number(),
-    allow_balance_pay: z.boolean(),
-    allow_wallet_overflow: z.boolean(),
-    max_purchase_per_user: z.coerce.number().min(0),
-    total_amount: z.coerce.number().min(0),
-    upgrade_group: z.string().optional(),
-    downgrade_group: z.string().optional(),
-    stripe_price_id: z.string().optional(),
-    creem_product_id: z.string().optional(),
-    waffo_pancake_product_id: z.string().optional(),
-  })
+  return z
+    .object({
+      title: z.string().min(1, t('Please enter plan title')),
+      subtitle: z.string().optional(),
+      price_amount: z.coerce.number().min(0, t('Please enter amount')),
+      duration_unit: z.enum(['year', 'month', 'day', 'hour', 'custom']),
+      duration_value: z.coerce.number().min(1),
+      custom_seconds: z.coerce.number().min(0).optional(),
+      quota_reset_period: z.enum([
+        'never',
+        'daily',
+        'weekly',
+        'monthly',
+        'custom',
+      ]),
+      quota_reset_custom_seconds: z.coerce.number().min(0).optional(),
+      quota_grant_mode: z.enum(['full', 'daily']),
+      daily_amount: z.coerce.number().min(0),
+      quota_expiry_policy: z.enum(['expire', 'retain']),
+      enabled: z.boolean(),
+      sort_order: z.coerce.number(),
+      allow_balance_pay: z.boolean(),
+      allow_wallet_overflow: z.boolean(),
+      max_purchase_per_user: z.coerce.number().min(0),
+      total_amount: z.coerce.number().min(0),
+      upgrade_group: z.string().optional(),
+      downgrade_group: z.string().optional(),
+      stripe_price_id: z.string().optional(),
+      creem_product_id: z.string().optional(),
+      waffo_pancake_product_id: z.string().optional(),
+    })
+    .superRefine((values, ctx) => {
+      if (values.quota_grant_mode !== 'daily') return
+      if (values.total_amount <= 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: t('Daily plans require a positive total quota cap'),
+          path: ['total_amount'],
+        })
+      }
+      if (values.daily_amount <= 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: t('Daily amount must be greater than zero'),
+          path: ['daily_amount'],
+        })
+      }
+    })
 }
 
 export type PlanFormValues = z.infer<ReturnType<typeof getPlanFormSchema>>
@@ -64,6 +85,9 @@ export const PLAN_FORM_DEFAULTS: PlanFormValues = {
   custom_seconds: 0,
   quota_reset_period: 'never',
   quota_reset_custom_seconds: 0,
+  quota_grant_mode: 'full',
+  daily_amount: 0,
+  quota_expiry_policy: 'expire',
   enabled: true,
   sort_order: 0,
   allow_balance_pay: true,
@@ -87,6 +111,9 @@ export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {
     custom_seconds: Number(plan.custom_seconds || 0),
     quota_reset_period: plan.quota_reset_period || 'never',
     quota_reset_custom_seconds: Number(plan.quota_reset_custom_seconds || 0),
+    quota_grant_mode: plan.quota_grant_mode || 'full',
+    daily_amount: quotaUnitsToDollars(Number(plan.daily_amount || 0)),
+    quota_expiry_policy: plan.quota_expiry_policy || 'expire',
     enabled: plan.enabled !== false,
     sort_order: Number(plan.sort_order || 0),
     allow_balance_pay: plan.allow_balance_pay !== false,
@@ -102,6 +129,8 @@ export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {
 }
 
 export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
+  const isDaily = values.quota_grant_mode === 'daily'
+
   return {
     plan: {
       ...values,
@@ -109,9 +138,16 @@ export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
       currency: 'USD',
       duration_value: Number(values.duration_value || 0),
       custom_seconds: Number(values.custom_seconds || 0),
-      quota_reset_period: values.quota_reset_period || 'never',
+      quota_grant_mode: isDaily ? 'daily' : 'full',
+      daily_amount: isDaily
+        ? parseQuotaFromDollars(Number(values.daily_amount || 0))
+        : 0,
+      quota_expiry_policy: values.quota_expiry_policy || 'expire',
+      quota_reset_period: isDaily
+        ? 'never'
+        : values.quota_reset_period || 'never',
       quota_reset_custom_seconds:
-        values.quota_reset_period === 'custom'
+        !isDaily && values.quota_reset_period === 'custom'
           ? Number(values.quota_reset_custom_seconds || 0)
           : 0,
       sort_order: Number(values.sort_order || 0),

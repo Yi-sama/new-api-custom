@@ -36,7 +36,63 @@ async function show(children: React.ReactNode) {
   render(<I18nextProvider i18n={i18n}>{children}</I18nextProvider>)
 }
 
+const requestModel: PricingModel = {
+  ...model,
+  model_name: 'seedance-2.0-fast-G3',
+  video_pricing: {
+    currency: 'CNY',
+    unit: 'request',
+    duration_seconds: [4, 8, 12],
+    default_resolution: '720p',
+    prices: [
+      { resolution: '720p', price_per_request: 0.8 },
+      { resolution: '1080p', price_per_request: 1.2 },
+      { resolution: '2k', price_per_request: 1.5 },
+    ],
+  },
+}
+
 describe('Video pricing', () => {
+  it('displays CNY per request with every resolution and the request badge', async () => {
+    await show(
+      <>
+        <ModelBillingModeBadge model={requestModel} />
+        <VideoPriceSummary model={requestModel} />
+      </>
+    )
+    expect(screen.getByText('Per Request')).toBeVisible()
+    expect(screen.queryByText('Per Second')).not.toBeInTheDocument()
+    expect(screen.getByText(/720p/)).toHaveTextContent('¥0.8')
+    expect(screen.getByText(/1080p/)).toHaveTextContent('¥1.2')
+    expect(screen.getByText(/2k/)).toHaveTextContent('¥1.5')
+    expect(document.body).not.toHaveTextContent('$')
+  })
+
+  it('charges request videos once per selected resolution, not per second', async () => {
+    await show(
+      <VideoPricingSection
+        model={{ ...requestModel, enable_groups: ['video', 'premium'] }}
+        groupRatio={{ video: 1, premium: 2 }}
+      />
+    )
+    expect(screen.getByLabelText('Estimated charge')).toHaveTextContent('¥0.8')
+    expect(
+      screen.queryByLabelText('Duration (seconds)')
+    ).not.toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Resolution'), '2k')
+    expect(screen.getByLabelText('Estimated charge')).toHaveTextContent('¥1.5')
+    await userEvent.selectOptions(screen.getByLabelText('Group'), 'premium')
+    expect(screen.getByLabelText('Estimated charge')).toHaveTextContent('¥3')
+    expect(screen.getByRole('row', { name: /1080p/ })).toHaveTextContent('¥2.4')
+  })
+
+  it('includes fixed-request videos only in the request filter', () => {
+    expect(filterByQuotaType([model, requestModel], 'second')).toEqual([model])
+    expect(filterByQuotaType([model, requestModel], 'request')).toEqual([
+      requestModel,
+    ])
+  })
+
   it('labels variable video pricing per second instead of per request', async () => {
     await show(
       <>

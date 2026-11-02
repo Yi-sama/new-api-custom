@@ -89,6 +89,21 @@ func TestListModelsSupportsOpenAIAndGeminiAuthentication(t *testing.T) {
 	}
 }
 
+func TestClaudeCountTokensRouteRequiresAuthentication(t *testing.T) {
+	setupRelayRouterTestDB(t)
+	engine := gin.New()
+	SetRelayRouter(engine)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/messages/count_tokens?beta=true", strings.NewReader(
+		`{"model":"claude-opus-5-5","messages":[{"role":"user","content":"Hello"}]}`,
+	))
+	request.Header.Set("Content-Type", "application/json")
+
+	engine.ServeHTTP(recorder, request)
+
+	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+}
+
 func setupRelayRouterTestDB(t *testing.T) {
 	t.Helper()
 

@@ -38,6 +38,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const { t } = useTranslation()
   const { setOpen, setCurrentRow, complianceConfirmed } = useSubscriptions()
   const isEnabled = row.original.plan.enabled
+  const isDailyPlan = row.original.plan.quota_grant_mode === 'daily'
   const toggleLabel = isEnabled ? t('Disable') : t('Enable')
 
   const handleEdit = () => {
@@ -74,22 +75,24 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
         <TooltipContent>{t('Edit')}</TooltipContent>
       </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant='ghost'
-              size='icon-sm'
-              disabled={!complianceConfirmed}
-              onClick={handleResetSubscriptions}
-              aria-label={t('Reset subscription quota')}
-            />
-          }
-        >
-          <RotateCcw />
-        </TooltipTrigger>
-        <TooltipContent>{t('Reset subscription quota')}</TooltipContent>
-      </Tooltip>
+      {!isDailyPlan && (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant='ghost'
+                size='icon-sm'
+                disabled={!complianceConfirmed}
+                onClick={handleResetSubscriptions}
+                aria-label={t('Reset subscription quota')}
+              />
+            }
+          >
+            <RotateCcw />
+          </TooltipTrigger>
+          <TooltipContent>{t('Reset subscription quota')}</TooltipContent>
+        </Tooltip>
+      )}
 
       <Tooltip>
         <TooltipTrigger

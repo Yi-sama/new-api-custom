@@ -2,6 +2,7 @@ import { AutoModelSettings } from '../extra/auto-model.tsx'
 import { ChannelHealthSettings } from '../extra/channel-health.tsx'
 import { ChannelStatusSettings } from '../extra/channel-status.tsx'
 import { FastModeSettings } from '../extra/fast-mode'
+import { DailyTokenPoolSettings } from '../extra/daily-token-pool'
 import { InactiveUsersSettings } from '../extra/inactive-users.tsx'
 import { NikoGroupSyncSettings } from '../extra/niko-group-sync.tsx'
 import { StatusImageSettings } from '../extra/status-image'
@@ -165,6 +166,11 @@ const OPERATIONS_SECTIONS = [
         FastModeAllowedGroups={settings.FastModeAllowedGroups}
       />
     ),
+  },
+  {
+    id: 'daily-token-pool',
+    titleKey: 'Daily shared token pool',
+    build: () => <DailyTokenPoolSettings />,
   },
   {
     id: 'niko-group-sync',

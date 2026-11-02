@@ -3,17 +3,17 @@ package router
 import (
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
-	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 func TestImageStudioRouterRegistersOnlyBridgeContractRoutes(t *testing.T) {
@@ -49,20 +49,28 @@ func TestImageStudioMetadataRemainsAuthenticatedDuringRelayOverload(t *testing.T
 	t.Setenv("IMAGE_STUDIO_IDENTITY_EMAIL_FORMAT", "")
 	t.Setenv("IMAGE_STUDIO_COOKIE_DOMAIN", "")
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
+	oldDB, oldRedis, oldSecret := model.DB, common.RedisEnabled, common.SessionSecret
+	oldMaster, oldPath := common.IsMasterNode, common.SQLitePath
+	oldMainType, oldLogType := common.MainDatabaseType(), common.LogDatabaseType()
+	t.Setenv("SQL_DSN", "local")
+	common.IsMasterNode, common.SQLitePath = false, filepath.Join(t.TempDir(), "studio.db")
+	require.NoError(t, model.InitDB())
+	db := model.DB
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	oldDB, oldRedis, oldSecret := model.DB, common.RedisEnabled, common.SessionSecret
-	model.DB, common.RedisEnabled, common.SessionSecret = db, false, "studio-router-test-secret"
+	common.RedisEnabled, common.SessionSecret = false, "studio-router-test-secret"
 	t.Cleanup(func() {
 		model.DB, common.RedisEnabled, common.SessionSecret = oldDB, oldRedis, oldSecret
+		common.IsMasterNode, common.SQLitePath = oldMaster, oldPath
+		common.SetDatabaseTypes(oldMainType, oldLogType)
 		require.NoError(t, sqlDB.Close())
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Channel{}, &model.ImageStudioCredit{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Channel{}, &model.Ability{}, &model.ImageStudioCredit{}))
 	user := model.User{Username: "studio-router-user", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1}
+	user.SetSetting(dto.UserSetting{AcceptUnsetRatioModel: true})
 	require.NoError(t, db.Create(&user).Error)
+	require.NoError(t, db.Create(&model.Ability{Group: "default", Model: "gpt-4o", ChannelId: 1, Enabled: true}).Error)
 	expires := time.Now().Add(time.Hour)
 	session := model.UserSession{
 		SID: "studio-router-session", UserID: user.Id, Version: 1,
@@ -79,7 +87,7 @@ func TestImageStudioMetadataRemainsAuthenticatedDuringRelayOverload(t *testing.T
 	setImageStudioRouter(router, func(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "system_memory_overloaded"}})
 	})
-	for _, path := range []string{"/context", "/groups"} {
+	for _, path := range []string{"/context", "/groups", "/v1/models"} {
 		t.Run(path, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, "/api/image-studio"+path, nil)
 			anonymous := httptest.NewRecorder()
@@ -98,10 +106,20 @@ func TestImageStudioMetadataRemainsAuthenticatedDuringRelayOverload(t *testing.T
 			} else {
 				assert.Contains(t, response.Body.String(), `"success":true`)
 			}
+			if path == "/v1/models" {
+				assert.Contains(t, response.Body.String(), `"object":"list"`)
+				assert.Contains(t, response.Body.String(), `"id":"gpt-4o"`)
+				request = httptest.NewRequest(http.MethodGet, "/api/image-studio"+path, nil)
+				request.AddCookie(&http.Cookie{Name: "new_api_image_studio", Value: token})
+				request.Header.Set("X-NewAPI-Group", "not-authorized")
+				forbidden := httptest.NewRecorder()
+				router.ServeHTTP(forbidden, request)
+				assert.Equal(t, http.StatusForbidden, forbidden.Code)
+			}
 		})
 	}
 	for _, route := range router.Routes() {
-		if route.Path == "/api/image-studio/context" || route.Path == "/api/image-studio/groups" {
+		if route.Path == "/api/image-studio/context" || route.Path == "/api/image-studio/groups" || route.Path == "/api/image-studio/v1/models" {
 			continue
 		}
 		request := httptest.NewRequest(route.Method, route.Path, nil)

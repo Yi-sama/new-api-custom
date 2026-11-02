@@ -96,6 +96,37 @@ export async function generateAccessToken(): Promise<ApiResponse<string>> {
 // Account Binding APIs
 // ============================================================================
 
+export interface QQBindingStatus {
+  enabled: boolean
+  bound: boolean
+  qq?: string
+  reward_granted?: boolean
+  reward_usd: number
+}
+
+export interface QQBindingCode {
+  code: string
+  qq: string
+  expires_at: number
+  reward_usd: number
+}
+
+export async function getQQBinding(): Promise<ApiResponse<QQBindingStatus>> {
+  const response = await api.get('/api/user/qq-binding')
+  return response.data
+}
+
+export async function createQQBindingCode(
+  qq: string
+): Promise<ApiResponse<QQBindingCode> & { code?: string }> {
+  const response = await api.post(
+    '/api/user/qq-binding/code',
+    { qq },
+    { skipBusinessError: true }
+  )
+  return response.data
+}
+
 /**
  * Send email verification code
  */

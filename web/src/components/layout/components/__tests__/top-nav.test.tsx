@@ -29,25 +29,29 @@ import { describe, expect, it } from 'vitest'
 import { TopNav } from '../top-nav'
 
 describe('Top navigation', () => {
-  it('provides the Image Studio link in the compact menu and horizontal navigation', async () => {
-    const rootRoute = createRootRoute({
-      component: () => (
-        <TopNav links={[{ title: 'Image Studio', href: '/image-studio' }]} />
-      ),
-    })
-    const router = createRouter({
-      routeTree: rootRoute,
-      history: createMemoryHistory(),
-    })
+  it.each([
+    { title: 'Image Studio', href: '/image-studio' },
+    { title: 'Shared token pool', href: '/shared-tokens' },
+  ])(
+    'provides $title in the compact menu and horizontal navigation',
+    async (link) => {
+      const rootRoute = createRootRoute({
+        component: () => <TopNav links={[link]} />,
+      })
+      const router = createRouter({
+        routeTree: rootRoute,
+        history: createMemoryHistory(),
+      })
 
-    render(<RouterProvider router={router} />)
+      render(<RouterProvider router={router} />)
 
-    await userEvent.setup().click(await screen.findByRole('button'))
-    expect(
-      screen.getByRole('menuitem', { name: 'Image Studio' })
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('navigation').querySelector('a[href="/image-studio"]')
-    ).toBeInTheDocument()
-  })
+      await userEvent.setup().click(await screen.findByRole('button'))
+      expect(
+        screen.getByRole('menuitem', { name: link.title })
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('navigation').querySelector(`a[href="${link.href}"]`)
+      ).toBeInTheDocument()
+    }
+  )
 })

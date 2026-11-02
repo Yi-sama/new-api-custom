@@ -81,21 +81,23 @@ type TokenCountMeta struct {
 }
 
 type RelayInfo struct {
-	TokenId           int
-	TokenKey          string
-	TokenGroup        string
-	UserId            int
-	UsingGroup        string // 使用的分组，当auto跨分组重试时，会变动
-	UserGroup         string // 用户所在分组
-	TokenUnlimited    bool
-	TokenFastMode     bool
-	FastMode          bool
-	FastModeRequested bool
-	FastModeTier      string
-	FastModeProtocol  string
-	StartTime         time.Time
-	FirstResponseTime time.Time
-	isFirstResponse   bool
+	DailyTokenPoolReservationID string
+	DailyTokenPoolFree          bool
+	TokenId                     int
+	TokenKey                    string
+	TokenGroup                  string
+	UserId                      int
+	UsingGroup                  string // 使用的分组，当auto跨分组重试时，会变动
+	UserGroup                   string // 用户所在分组
+	TokenUnlimited              bool
+	TokenFastMode               bool
+	FastMode                    bool
+	FastModeRequested           bool
+	FastModeTier                string
+	FastModeProtocol            string
+	StartTime                   time.Time
+	FirstResponseTime           time.Time
+	isFirstResponse             bool
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -828,7 +830,12 @@ func (info *RelayInfo) SetReasoningEffort(effort string) {
 	if info == nil {
 		return
 	}
-	info.ReasoningEffort = strings.TrimSpace(effort)
+	effort = strings.TrimSpace(effort)
+	// Codex sends Ultra as max on the wire; keep the header-declared level.
+	if strings.EqualFold(effort, "max") {
+		effort = normalizeReasoningEffortFromHeaders(effort, info.RequestHeaders)
+	}
+	info.ReasoningEffort = effort
 }
 
 func (info *RelayInfo) EnsureClaudeConvertInfo() *convmeta.ClaudeConvertInfo {

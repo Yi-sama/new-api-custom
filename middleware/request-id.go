@@ -14,6 +14,6 @@ func RequestId() func(c *gin.Context) {
 		ctx := context.WithValue(c.Request.Context(), common.RequestIdKey, id)
 		c.Request = c.Request.WithContext(ctx)
 		c.Header(common.RequestIdKey, id)
-		c.Next()
+		traceRelayRequest(c)
 	}
 }

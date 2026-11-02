@@ -133,12 +133,22 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
+			sr.Done()
 		case "response.failed", "response.incomplete", "response.cancelled", "response.canceled":
 			if !imageCommitted {
 				imageCounter.Reset()
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
+			terminalErr := fmt.Errorf("upstream response ended with %s", streamResponse.Type)
+			if streamResponse.Response != nil {
+				if upstreamErr := streamResponse.Response.GetOpenAIError(); upstreamErr != nil && upstreamErr.Message != "" {
+					terminalErr = fmt.Errorf("%s: %s", streamResponse.Type, upstreamErr.Message)
+				}
+			}
+			// The terminal is already forwarded; stop without returning a relay error
+			// that would append JSON or replay an already committed stream.
+			sr.Stop(terminalErr)
 		case "response.output_text.delta":
 			// 处理输出文本
 			responseTextBuilder.WriteString(streamResponse.Delta)

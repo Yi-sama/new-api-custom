@@ -80,6 +80,7 @@ import { DynamicPricingBreakdown } from './dynamic-pricing-breakdown'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelDetailsApi } from './model-details-api'
 import { ModelDetailsPerformance } from './model-details-performance'
+import { OfficialPriceComparison } from './official-price-comparison'
 import { VideoPricingSection } from './video-pricing'
 
 // ----------------------------------------------------------------------------
@@ -1187,6 +1188,11 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
           ) : (
             <section className='bg-card/60 space-y-5 rounded-xl border p-4 shadow-sm'>
               <SectionTitle>{t('Pricing')}</SectionTitle>
+              <OfficialPriceComparison
+                model={props.model}
+                selectedGroup={props.autoGroup}
+                priceRate={props.priceRate}
+              />
               <PriceSection
                 model={props.model}
                 priceRate={props.priceRate}

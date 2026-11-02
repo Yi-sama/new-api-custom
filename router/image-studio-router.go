@@ -16,10 +16,10 @@ func setImageStudioRouter(router *gin.Engine, performanceCheck gin.HandlerFunc) 
 	studio.Use(middleware.RouteTag("api"))
 	studio.GET("/context", controller.ImageStudioBridgeAuth(), middleware.DisableCache(), controller.GetImageStudioContext)
 	studio.GET("/groups", controller.ImageStudioBridgeAuth(), middleware.DisableCache(), controller.GetUserGroups)
+	studio.GET("/v1/models", controller.ImageStudioBridgeAuth(), middleware.DisableCache(), controller.ImageStudioGroupAuthorization(), controller.GetImageStudioModels)
 
 	// Account metadata must remain readable when relay admission is suspended.
 	studio.Use(middleware.RouteTag("relay"), performanceCheck, controller.ImageStudioBridgeAuth())
-	studio.GET("/v1/models", middleware.DisableCache(), controller.ImageStudioGroupAuthorization(), controller.GetImageStudioModels)
 
 	relay := studio.Group("/v1")
 	relay.Use(controller.ImageStudioGroupAuthorization(), controller.ImageStudioWriteOriginGuard(), controller.ImageStudioNormalizeRelayPath(), middleware.Distribute())

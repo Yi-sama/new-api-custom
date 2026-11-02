@@ -35,6 +35,7 @@ import { formatPrice, formatRequestPrice } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { OfficialPriceComparison } from './official-price-comparison'
 import { VideoPriceSummary } from './video-pricing'
 
 export interface ModelCardProps {
@@ -253,6 +254,12 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           </button>
         </div>
       </div>
+
+      <OfficialPriceComparison
+        model={props.model}
+        selectedGroup={props.selectedGroup}
+        priceRate={priceRate}
+      />
 
       {/* Description */}
       <p className='text-muted-foreground mt-2 line-clamp-1 flex-1 text-[13px] leading-relaxed sm:mt-4 sm:line-clamp-2 sm:min-h-[2.5rem]'>

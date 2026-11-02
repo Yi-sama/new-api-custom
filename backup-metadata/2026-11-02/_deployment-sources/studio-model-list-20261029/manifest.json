@@ -1,0 +1,8 @@
+{
+  "sha256": "1774ddb124a13863a80df542237c6ef3a698059c11184479051308e15fb69542",
+  "baseline": "5c644a770fe6568564fcc8250884c461b1911398095cc1b03a8997c28b5023cc",
+  "remote_build": false,
+  "changed_sources": [
+    "router/image-studio-router.go"
+  ]
+}

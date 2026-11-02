@@ -19,6 +19,7 @@ func FlushWriter(c *gin.Context) (err error) {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("flush panic recovered: %v", r)
 		}
+		common.RelayTraceFromContext(c).RecordError("downstream_flush_error", err)
 	}()
 
 	if c == nil || c.Writer == nil {

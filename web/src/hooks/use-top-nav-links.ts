@@ -91,6 +91,8 @@ export function useTopNavLinks(): TopNavLink[] {
   })
 
   // Pricing
+  links.push({ title: t('Shared token pool'), href: '/shared-tokens' })
+
   const pricing = modules?.pricing
   if (pricing && typeof pricing === 'object' && pricing.enabled) {
     const requiresAuth = pricing.requireAuth && !isAuthed

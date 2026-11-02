@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"regexp"
 	"strings"
 	"sync"
@@ -538,13 +539,31 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	}
 
 	common2.SetContextKey(c, mainconstant.ContextKeyUpstreamRequestAttempted, true)
+	attempt := common2.RelayTraceFromContext(c).BeginAttempt(info.ChannelId)
+	if attempt != nil {
+		req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+			WroteRequest: func(w httptrace.WroteRequestInfo) {
+				attempt.Add("http_write_count", 1)
+				attempt.Mark("request_written_ms")
+				attempt.RecordError("request_write_error", w.Err)
+			},
+			GotFirstResponseByte: func() { attempt.Mark("first_response_byte_ms") },
+		}))
+	}
 	resp, err := relayClient.Do(req)
 	if err != nil {
+		attempt.RecordError("request_error", err)
 		logger.LogError(c, "do request failed: "+err.Error())
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
 	if resp == nil {
 		return nil, errors.New("resp is nil")
+	}
+	attempt.Mark("response_headers_ms")
+	attempt.Set("http_status", resp.StatusCode)
+	attempt.Set("protocol", resp.Proto)
+	if attempt != nil && resp.Body != nil {
+		resp.Body = &tracedUpstreamBody{ReadCloser: resp.Body, trace: attempt}
 	}
 	info.ObserveFastModeProtocol(resp.Header)
 	if common2.GetContextKeyString(c, mainconstant.ContextKeyStudioJobID) != "" && mainconstant.MaxFileDownloadMB > 0 {
@@ -562,13 +581,18 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		))
 	}
 
+	upstreamID := ""
 	if upID := resp.Header.Get(common2.RequestIdKey); upID != "" {
+		upstreamID = upID
 		c.Set(common2.UpstreamRequestIdKey, upID)
 	} else if clientID := resp.Header.Get("X-Client-Request-ID"); clientID != "" {
+		upstreamID = "client:" + clientID
 		c.Set(common2.UpstreamRequestIdKey, "client:"+clientID)
 	} else if upID := resp.Header.Get("X-Request-ID"); upID != "" {
+		upstreamID = upID
 		c.Set(common2.UpstreamRequestIdKey, upID)
 	}
+	attempt.Set("upstream_request_id", common2.RelayTraceID(upstreamID))
 
 	_ = req.Body.Close()
 	_ = c.Request.Body.Close()

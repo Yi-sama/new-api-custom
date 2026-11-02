@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -94,6 +94,34 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
           </span>
         ),
         size: 100,
+      },
+      {
+        id: 'allocation',
+        header: t('Quota Allocation'),
+        meta: { mobileHidden: true },
+        cell: ({ row }) => {
+          const plan = row.original.plan
+          if (plan.quota_grant_mode !== 'daily') {
+            return (
+              <span className='text-muted-foreground'>{t('Full quota')}</span>
+            )
+          }
+          return (
+            <div className='text-muted-foreground text-xs'>
+              <div>{t('Daily accrual')}</div>
+              <div>
+                {t('Daily amount')}:{' '}
+                {formatQuota(Number(plan.daily_amount || 0))}
+              </div>
+              <div>
+                {plan.quota_expiry_policy === 'retain'
+                  ? t('Retain earned balance')
+                  : t('Expires with subscription')}
+              </div>
+            </div>
+          )
+        },
+        size: 180,
       },
       {
         accessorFn: (row) => row.plan.sort_order,

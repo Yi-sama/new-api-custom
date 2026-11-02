@@ -34,7 +34,7 @@ export function ModelBillingModeBadge(props: ModelBillingModeBadgeProps) {
   let label = t('Per Request')
   let variant: StatusVariant = 'purple'
 
-  if (props.model.video_pricing) {
+  if (props.model.video_pricing?.unit === 'second') {
     label = t('Per Second')
     variant = 'info'
   } else if (isDynamicPricingModel(props.model)) {

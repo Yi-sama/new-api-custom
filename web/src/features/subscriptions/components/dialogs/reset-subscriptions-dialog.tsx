@@ -39,6 +39,8 @@ export function ResetSubscriptionsDialog() {
     if (isOpen) setAdvanceResetTime(true)
   }, [isOpen])
 
+  if (plan?.quota_grant_mode === 'daily') return null
+
   const handleConfirm = async () => {
     if (!plan?.id) return
     setResetting(true)

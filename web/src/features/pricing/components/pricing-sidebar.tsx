@@ -211,13 +211,17 @@ export function PricingSidebar(props: PricingSidebarProps) {
       label: quotaTypeLabels[QUOTA_TYPES.REQUEST],
       count: countBy(
         props.models,
-        (model) => model.quota_type === 1 && !model.video_pricing
+        (model) =>
+          model.quota_type === 1 && model.video_pricing?.unit !== 'second'
       ),
     },
     {
       value: QUOTA_TYPES.SECOND,
       label: quotaTypeLabels[QUOTA_TYPES.SECOND],
-      count: countBy(props.models, (model) => Boolean(model.video_pricing)),
+      count: countBy(
+        props.models,
+        (model) => model.video_pricing?.unit === 'second'
+      ),
     },
   ]
 
