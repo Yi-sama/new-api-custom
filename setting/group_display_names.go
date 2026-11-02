@@ -1,35 +1,73 @@
 package setting
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/tidwall/gjson"
 )
 
 const GroupDisplayNamesOptionKey = "GroupDisplayNames"
 
 var (
 	groupDisplayNamesMu sync.RWMutex
-	groupDisplayNames   = map[string]string{}
+	groupDisplayNames   = []GroupDisplayName{}
 )
 
-func parseGroupDisplayNames(value string) (map[string]string, error) {
-	var values map[string]any
-	if err := common.UnmarshalJsonStr(value, &values); err != nil {
-		return nil, fmt.Errorf("group display names must be a JSON object of strings: %w", err)
+type GroupDisplayName struct {
+	Group string `json:"group"`
+	Name  string `json:"name"`
+}
+
+func parseGroupDisplayNames(value string) ([]GroupDisplayName, error) {
+	var raw json.RawMessage
+	if err := common.UnmarshalJsonStr(value, &raw); err != nil {
+		return nil, fmt.Errorf("invalid group display names: %w", err)
 	}
-	if values == nil {
-		return nil, fmt.Errorf("group display names must be a JSON object of strings")
-	}
-	names := make(map[string]string, len(values))
-	for group, value := range values {
-		name, ok := value.(string)
-		if !ok || strings.TrimSpace(group) == "" {
-			return nil, fmt.Errorf("group display names must map non-empty group identifiers to strings")
+	names := make([]GroupDisplayName, 0)
+	switch common.GetJsonType(raw) {
+	case "array":
+		if err := common.Unmarshal(raw, &names); err != nil {
+			return nil, fmt.Errorf("group display names must contain group and name strings: %w", err)
 		}
-		names[group] = name
+	case "object":
+		// Legacy objects retain their JSON key order instead of Go map iteration order.
+		var invalid bool
+		gjson.ParseBytes(raw).ForEach(func(group, name gjson.Result) bool {
+			if name.Type != gjson.String {
+				invalid = true
+				return false
+			}
+			names = append(names, GroupDisplayName{Group: group.String(), Name: name.String()})
+			return true
+		})
+		if invalid {
+			return nil, fmt.Errorf("group display names must map group identifiers to strings")
+		}
+	default:
+		return nil, fmt.Errorf("group display names must be an array or a legacy JSON object")
+	}
+	groups, labels := make(map[string]bool), make(map[string]bool)
+	for index := range names {
+		row := &names[index]
+		row.Name = strings.TrimSpace(row.Name)
+		if strings.TrimSpace(row.Group) == "" || row.Name == "" {
+			return nil, fmt.Errorf("row %d: group and display name are required", index+1)
+		}
+		if utf8.RuneCountInString(row.Name) > 200 {
+			return nil, fmt.Errorf("row %d: display name must be at most 200 characters", index+1)
+		}
+		if groups[row.Group] {
+			return nil, fmt.Errorf("row %d: each group can only appear once", index+1)
+		}
+		if labels[row.Name] {
+			return nil, fmt.Errorf("row %d: display names must be unique", index+1)
+		}
+		groups[row.Group], labels[row.Name] = true, true
 	}
 	return names, nil
 }
@@ -37,6 +75,15 @@ func parseGroupDisplayNames(value string) (map[string]string, error) {
 func ValidateGroupDisplayNames(value string) error {
 	_, err := parseGroupDisplayNames(value)
 	return err
+}
+
+func NormalizeGroupDisplayNamesJSON(value string) (string, error) {
+	names, err := parseGroupDisplayNames(value)
+	if err != nil {
+		return "", err
+	}
+	data, err := common.Marshal(names)
+	return string(data), err
 }
 
 func UpdateGroupDisplayNamesByJSONString(value string) error {
@@ -50,14 +97,10 @@ func UpdateGroupDisplayNamesByJSONString(value string) error {
 	return nil
 }
 
-func GetGroupDisplayNamesCopy() map[string]string {
+func GetGroupDisplayNamesCopy() []GroupDisplayName {
 	groupDisplayNamesMu.RLock()
 	defer groupDisplayNamesMu.RUnlock()
-	names := make(map[string]string, len(groupDisplayNames))
-	for group, name := range groupDisplayNames {
-		names[group] = name
-	}
-	return names
+	return append([]GroupDisplayName{}, groupDisplayNames...)
 }
 
 func GroupDisplayNames2JSONString() string {
@@ -65,7 +108,7 @@ func GroupDisplayNames2JSONString() string {
 	defer groupDisplayNamesMu.RUnlock()
 	data, err := common.Marshal(groupDisplayNames)
 	if err != nil {
-		return "{}"
+		return "[]"
 	}
 	return string(data)
 }

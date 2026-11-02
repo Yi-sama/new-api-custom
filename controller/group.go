@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
@@ -62,9 +61,10 @@ func GetUserGroups(c *gin.Context) {
 		}
 	}
 	displayNames := setting.GetGroupDisplayNamesCopy()
-	for groupName, info := range usableGroups {
-		if name := strings.TrimSpace(displayNames[groupName]); name != "" {
-			info["display_name"] = name
+	for index, row := range displayNames {
+		if info, ok := usableGroups[row.Group]; ok {
+			info["display_name"] = row.Name
+			info["display_order"] = index + 1
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{

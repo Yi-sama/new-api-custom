@@ -69,19 +69,27 @@ func TestGetUserGroupsDisplayNamesPreserveGroupAccessAndPricing(t *testing.T) {
 	assert.Equal(t, map[string]any{"ratio": "\u81ea\u52a8", "desc": "Automatic"}, original["auto"])
 
 	require.NoError(t, model.UpdateOption("GroupDisplayNames",
-		`{"default":" GPT ","auto":"All models","blank":"  ","hidden":"Hidden","unknown":"Unknown"}`))
+		`[{"group":"hidden","name":"Hidden"},{"group":"default","name":" GPT "},{"group":"unknown","name":"Unknown"},{"group":"auto","name":"All models"}]`))
 	groups := readGroups()
 	assert.Equal(t, "GPT", groups["default"]["display_name"])
+	assert.Equal(t, float64(2), groups["default"]["display_order"])
 	assert.Equal(t, "All models", groups["auto"]["display_name"])
+	assert.Equal(t, float64(4), groups["auto"]["display_order"])
 	assert.NotContains(t, groups["vip"], "display_name")
+	assert.NotContains(t, groups["vip"], "display_order")
 	assert.NotContains(t, groups["blank"], "display_name")
 	assert.NotContains(t, groups, "hidden")
 	assert.NotContains(t, groups, "unknown")
 	for _, info := range groups {
 		delete(info, "display_name")
+		delete(info, "display_order")
 	}
 	assert.Equal(t, original, groups)
 
-	require.NoError(t, model.UpdateOption("GroupDisplayNames", `{}`))
+	require.NoError(t, model.UpdateOption("GroupDisplayNames", `{"auto":"All","default":"GPT"}`))
+	assert.Equal(t, float64(1), readGroups()["auto"]["display_order"])
+	assert.Equal(t, float64(2), readGroups()["default"]["display_order"])
+
+	require.NoError(t, model.UpdateOption("GroupDisplayNames", `[]`))
 	assert.Equal(t, original, readGroups(), "clearing display names takes effect without a restart")
 }

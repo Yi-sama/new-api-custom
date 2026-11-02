@@ -5929,6 +5929,17 @@
     "Estimated charge": "预计扣费",
     "Price per second (CNY)": "单价（元/秒）",
     "Cost for {{seconds}} seconds": "{{seconds}} 秒费用（元）",
-    "Charged by resolution and requested duration, not a flat request fee. Failed tasks are refunded.": "按分辨率和请求时长计费，不是固定每次收费；失败任务退还已扣额度。"
+    "Charged by resolution and requested duration, not a flat request fee. Failed tasks are refunded.": "按分辨率和请求时长计费，不是固定每次收费；失败任务退还已扣额度。",
+    "Group is required": "请选择分组",
+    "Display name is required": "请填写显示名",
+    "Display names must be at most 200 characters": "显示名最多 200 字",
+    "Each group can only appear once": "同一分组只能配置一次",
+    "Display names must be unique": "显示名不能重复",
+    "Add row": "添加一行",
+    "Delete row": "删除这一行",
+    "GPT / Claude / Gemini / Local models": "填入 GPT / Claude / Gemini / 国模",
+    "Order": "排序",
+    "Automatic": "自动",
+    "Free of charge": "免费"
   }
 }

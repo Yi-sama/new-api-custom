@@ -5897,6 +5897,17 @@
     "{{matched}} matched, {{unmatched}} unmatched requests": "{{matched}} matched, {{unmatched}} unmatched requests",
     "Open Tavern": "Open Tavern",
     "Back to dashboard": "Back to dashboard",
-    "Tavern is only available in the local test environment.": "Tavern is only available in the local test environment."
+    "Tavern is only available in the local test environment.": "Tavern is only available in the local test environment.",
+    "Group is required": "Group is required",
+    "Display name is required": "Display name is required",
+    "Display names must be at most 200 characters": "Display names must be at most 200 characters",
+    "Each group can only appear once": "Each group can only appear once",
+    "Display names must be unique": "Display names must be unique",
+    "Add row": "Add row",
+    "Delete row": "Delete row",
+    "GPT / Claude / Gemini / Local models": "GPT / Claude / Gemini / Local models",
+    "Order": "Order",
+    "Automatic": "Automatic",
+    "Free of charge": "Free of charge"
   }
 }

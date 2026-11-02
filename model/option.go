@@ -276,6 +276,14 @@ func UpdateOptionsBulk(values map[string]string) error {
 		return nil
 	}
 	for key, value := range values {
+		if key == setting.GroupDisplayNamesOptionKey {
+			normalized, err := setting.NormalizeGroupDisplayNamesJSON(value)
+			if err != nil {
+				return err
+			}
+			values[key] = normalized
+			continue
+		}
 		if err := validateOptionValue(key, value); err != nil {
 			return err
 		}
