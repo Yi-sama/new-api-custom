@@ -140,6 +140,9 @@ func main() {
 		if platform == constant.TaskPlatformEmberMJ {
 			return &service.EmberMJAdaptor{}
 		}
+		if platform == constant.TaskPlatformOCMJ {
+			return &service.OCMJAdaptor{}
+		}
 		a := relay.GetTaskAdaptor(platform)
 		if a == nil {
 			return nil

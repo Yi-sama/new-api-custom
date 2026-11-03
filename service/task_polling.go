@@ -143,6 +143,10 @@ func RunTaskPollingOnce(ctx context.Context, report func(processed, total int)) 
 		for _, task := range tasks {
 			upstreamID := task.GetUpstreamTaskID()
 			if upstreamID == "" {
+				if task.Platform == constant.TaskPlatformOCMJ {
+					// An ambiguous submission is not proof of failure and must not be replayed.
+					continue
+				}
 				// 统计失败的未完成任务
 				nullTaskIds = append(nullTaskIds, task.ID)
 				continue
@@ -456,7 +460,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	key := ch.Key
 
 	privateData := task.PrivateData
-	if platform := task.Platform; platform == constant.TaskPlatformEmberMJ && privateData.UpstreamBaseURL != "" {
+	if platform := task.Platform; (platform == constant.TaskPlatformEmberMJ || platform == constant.TaskPlatformOCMJ) && privateData.UpstreamBaseURL != "" {
 		baseURL = privateData.UpstreamBaseURL
 		proxy = privateData.UpstreamProxy
 	}
@@ -496,8 +500,8 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	} else if taskResult, err = adaptor.ParseTaskResult(responseBody); err != nil {
 		return fmt.Errorf("parseTaskResult failed for task %s: %w", taskId, err)
 	}
-	if task.Platform == constant.TaskPlatformEmberMJ && taskResult.TaskID != task.GetUpstreamTaskID() {
-		return errors.New("MJ task query returned a different UUID")
+	if (task.Platform == constant.TaskPlatformEmberMJ || task.Platform == constant.TaskPlatformOCMJ) && taskResult.TaskID != task.GetUpstreamTaskID() {
+		return errors.New("MJ task query returned a different task ID")
 	}
 
 	task.Data = redactVideoResponseBody(responseBody)

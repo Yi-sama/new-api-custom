@@ -47,6 +47,10 @@ type EmberMJResult struct {
 
 // Never follow a provider redirect with the saved task credential.
 func EmberMJRequest(ctx context.Context, method, baseURL, path, key, proxy string, body io.Reader, contentType, requestID string) (*http.Response, error) {
+	return mjRequest(ctx, method, baseURL, path, key, proxy, body, contentType, requestID, "mj-proxy")
+}
+
+func mjRequest(ctx context.Context, method, baseURL, path, key, proxy string, body io.Reader, contentType, requestID, protocol string) (*http.Response, error) {
 	target, err := url.Parse(strings.TrimRight(baseURL, "/"))
 	if err != nil || target.Host == "" || (target.Scheme != "https" && target.Scheme != "http") || target.User != nil {
 		return nil, errors.New("invalid MJ channel address")
@@ -64,7 +68,9 @@ func EmberMJRequest(ctx context.Context, method, baseURL, path, key, proxy strin
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Accept", "application/json")
 	if method == http.MethodPost {
-		req.Header.Set(EmberMJProtocolHeader, "mj-proxy")
+		if protocol != "" {
+			req.Header.Set(EmberMJProtocolHeader, protocol)
+		}
 		req.Header.Set("Idempotency-Key", requestID)
 		req.Header.Set("Content-Type", contentType)
 		// A task submission must never be replayed by the HTTP transport.

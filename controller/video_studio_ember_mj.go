@@ -144,7 +144,7 @@ func studioEmberMJBody(c *gin.Context, fields map[string]any, modelName string) 
 	return &buffer, writer.FormDataContentType(), "/images/edits", nil
 }
 
-func submitStudioEmberMJ(c *gin.Context, job *model.StudioJob) {
+func submitStudioMJ(c *gin.Context, job *model.StudioJob, platform constant.TaskPlatform) {
 	fields, _, err := readStudioJobRequest(c, "image")
 	if err != nil {
 		studioJobError(c, http.StatusBadRequest, err.Error())
@@ -164,7 +164,13 @@ func submitStudioEmberMJ(c *gin.Context, job *model.StudioJob) {
 		studioJobError(c, http.StatusBadRequest, "could not map MJ model")
 		return
 	}
-	body, contentType, path, err := studioEmberMJBody(c, fields, info.UpstreamModelName)
+	var body io.Reader
+	var contentType, path string
+	if platform == constant.TaskPlatformOCMJ {
+		body, contentType, path, err = studioOCMJBody(c, fields, info.UpstreamModelName)
+	} else {
+		body, contentType, path, err = studioEmberMJBody(c, fields, info.UpstreamModelName)
+	}
 	if err != nil {
 		studioJobError(c, http.StatusBadRequest, err.Error())
 		return
@@ -188,20 +194,25 @@ func submitStudioEmberMJ(c *gin.Context, job *model.StudioJob) {
 		}
 	}()
 	upstreamID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(job.ID)).String()
+	status := model.TaskStatus(model.TaskStatusSubmitted)
+	savedID := upstreamID
+	if platform == constant.TaskPlatformOCMJ {
+		status, savedID = model.TaskStatusUnknown, ""
+	}
 	task := &model.Task{
-		TaskID: job.TaskID, Platform: constant.TaskPlatformEmberMJ, UserId: job.UserID, Group: job.Group,
-		ChannelId: info.ChannelId, Quota: price.Quota, Status: model.TaskStatusSubmitted, Progress: "10%",
+		TaskID: job.TaskID, Platform: platform, UserId: job.UserID, Group: job.Group,
+		ChannelId: info.ChannelId, Quota: price.Quota, Status: status, Progress: "10%",
 		SubmitTime: common.GetTimestamp(), Action: info.Action,
 		Properties: model.Properties{OriginModelName: job.Model, UpstreamModelName: info.UpstreamModelName},
 		PrivateData: model.TaskPrivateData{
-			Key: info.ApiKey, UpstreamBaseURL: info.ChannelBaseUrl, UpstreamProxy: info.ChannelSetting.Proxy, UpstreamTaskID: upstreamID,
+			Key: info.ApiKey, UpstreamBaseURL: info.ChannelBaseUrl, UpstreamProxy: info.ChannelSetting.Proxy, UpstreamTaskID: savedID,
 			BillingSource: info.BillingSource, SubscriptionId: info.SubscriptionId, NodeName: common.NodeName,
 			BillingContext: &model.TaskBillingContext{OriginModelName: job.Model, ModelPrice: price.ModelPrice,
 				RatioInfo: &price.GroupRatioInfo, GroupRatio: price.GroupRatioInfo.GroupRatio,
 				OtherRatios: price.OtherRatios(), PerCallBilling: true},
 		},
 	}
-	// Save the route and UUID before POST. Recovery can only query this task.
+	// Persist billing and route before the only POST. OC assigns its task ID on acceptance.
 	if err := task.Insert(); err != nil {
 		studioJobError(c, http.StatusInternalServerError, "could not persist MJ task")
 		return
@@ -214,35 +225,73 @@ func submitStudioEmberMJ(c *gin.Context, job *model.StudioJob) {
 	}
 	service.LogTaskConsumption(c, info)
 	common.SetContextKey(c, constant.ContextKeyUpstreamRequestAttempted, true)
-	response, requestErr := service.EmberMJRequest(c.Request.Context(), http.MethodPost, info.ChannelBaseUrl, path, info.ApiKey, info.ChannelSetting.Proxy, body, contentType, upstreamID)
-	if requestErr != nil {
-		common.SysError("MJ submission unconfirmed " + job.ID + "; query original UUID")
+	var response *http.Response
+	var requestErr error
+	if platform == constant.TaskPlatformOCMJ {
+		response, requestErr = service.OCMJRequest(c.Request.Context(), http.MethodPost, info.ChannelBaseUrl, path, info.ApiKey, info.ChannelSetting.Proxy, body, upstreamID)
 	} else {
-		response.Body.Close()
-		switch response.StatusCode {
-		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusUnprocessableEntity:
+		response, requestErr = service.EmberMJRequest(c.Request.Context(), http.MethodPost, info.ChannelBaseUrl, path, info.ApiKey, info.ChannelSetting.Proxy, body, contentType, upstreamID)
+	}
+	if requestErr != nil {
+		common.SysError("MJ submission unconfirmed " + job.ID + "; do not resubmit")
+	} else {
+		if platform == constant.TaskPlatformOCMJ && response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
+			responseBody, readErr := io.ReadAll(io.LimitReader(response.Body, 65537))
+			var result service.OCMJResult
+			if readErr == nil && len(responseBody) <= 65536 && common.Unmarshal(responseBody, &result) == nil && service.ValidOCMJTaskID(result.TaskID) {
+				task.PrivateData.UpstreamTaskID = result.TaskID
+				task.Status = model.TaskStatusSubmitted
+			} else {
+				common.SysError("MJ submission has no valid upstream receipt " + job.ID)
+				if len(responseBody) > 4096 {
+					responseBody = responseBody[:4096]
+				}
+				task.PrivateData.UpstreamSubmitErrorBody = string(responseBody)
+			}
+			task.PrivateData.UpstreamSubmitHTTPStatus = response.StatusCode
+			if _, err := task.UpdateWithStatus(status); err != nil {
+				common.SysError("MJ receipt persistence " + job.ID + ": " + err.Error())
+			}
+		} else if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+			errorBody, readErr := io.ReadAll(io.LimitReader(response.Body, 4096))
+			task.PrivateData.UpstreamSubmitHTTPStatus = response.StatusCode
+			task.PrivateData.UpstreamSubmitErrorBody = string(errorBody)
+			common.SysError(fmt.Sprintf("MJ submission %s: HTTP %d; upstream task %s", job.ID, response.StatusCode, upstreamID))
+			if readErr != nil {
+				common.SysError("MJ submission error response incomplete " + job.ID)
+			}
 			previous := task.Status
-			task.Status, task.FailReason, task.Progress = model.TaskStatusFailure, "MJ submission rejected", "100%"
+			switch response.StatusCode {
+			case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusUnprocessableEntity:
+				reason := fmt.Sprintf("MJ submission rejected (HTTP %d)", response.StatusCode)
+				task.Status, task.FailReason, task.Progress = model.TaskStatusFailure, reason, "100%"
+			case http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusTooManyRequests:
+				if platform == constant.TaskPlatformOCMJ {
+					reason := fmt.Sprintf("MJ submission rejected (HTTP %d)", response.StatusCode)
+					task.Status, task.FailReason, task.Progress = model.TaskStatusFailure, reason, "100%"
+				}
+			}
 			won, updateErr := task.UpdateWithStatus(previous)
 			if updateErr != nil {
-				common.SysError("MJ rejection persistence " + job.ID + ": " + updateErr.Error())
-			} else if won {
+				common.SysError("MJ submission persistence " + job.ID + ": " + updateErr.Error())
+			} else if won && task.Status == model.TaskStatusFailure {
 				service.RefundTaskQuota(c.Request.Context(), task, task.FailReason)
 			}
 		}
+		response.Body.Close()
 	}
 	c.JSON(http.StatusAccepted, gin.H{"id": task.TaskID, "status": "submitted"})
 }
 
-func isStudioEmberMJTask(job *model.StudioJob) bool {
+func isStudioMJTask(job *model.StudioJob) bool {
 	if job.TaskID == "" {
 		return false
 	}
 	task, exists, err := model.GetByTaskId(job.UserID, job.TaskID)
-	return err == nil && exists && task.Platform == constant.TaskPlatformEmberMJ
+	return err == nil && exists && (task.Platform == constant.TaskPlatformEmberMJ || task.Platform == constant.TaskPlatformOCMJ)
 }
 
-func syncStudioEmberMJResult(ctx context.Context, job *model.StudioJob) error {
+func syncStudioMJResult(ctx context.Context, job *model.StudioJob) error {
 	job.Status, job.Error = model.StudioJobSubmitted, ""
 	task, exists, err := model.GetByTaskId(job.UserID, job.TaskID)
 	if err != nil {
@@ -255,7 +304,26 @@ func syncStudioEmberMJResult(ctx context.Context, job *model.StudioJob) error {
 		job.Status, job.Error = model.StudioJobFailed, task.FailReason
 		return nil
 	}
+	if task.Platform == constant.TaskPlatformOCMJ && task.PrivateData.UpstreamTaskID == "" {
+		job.Status, job.Error = model.StudioJobUncertain, "MJ submission unconfirmed; no upstream task ID was received; do not automatically resubmit"
+		return nil
+	}
 	if task.Status != model.TaskStatusSuccess {
+		return nil
+	}
+	if task.Platform == constant.TaskPlatformOCMJ {
+		adaptor := &service.OCMJAdaptor{}
+		if _, err := adaptor.ParseTaskResult(task.Data); err != nil {
+			return err
+		}
+		var result service.OCMJResult
+		if err := common.Unmarshal(task.Data, &result); err != nil {
+			return err
+		}
+		if err := storeStudioImageResult(job, bytes.NewReader(result.Result)); err != nil {
+			return err
+		}
+		job.Status, job.Error = model.StudioJobSucceeded, ""
 		return nil
 	}
 	adaptor := &service.EmberMJAdaptor{}

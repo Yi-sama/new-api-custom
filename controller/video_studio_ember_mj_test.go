@@ -35,6 +35,7 @@ func TestStudioEmberMJDurableProtocol(t *testing.T) {
 	}{
 		{"accepted", http.StatusAccepted, false, false},
 		{"ambiguous submission recovers", http.StatusBadGateway, false, false},
+		{"unavailable submission recovers", http.StatusServiceUnavailable, false, false},
 		{"reference image", http.StatusAccepted, true, false},
 		{"definitive rejection", http.StatusBadRequest, false, false},
 		{"asynchronous failure", http.StatusAccepted, false, true},
@@ -78,6 +79,10 @@ func TestStudioEmberMJDurableProtocol(t *testing.T) {
 						assert.NotContains(t, body, "response_format")
 					}
 					w.WriteHeader(scenario.submitCode)
+					if scenario.submitCode >= http.StatusBadRequest {
+						fmt.Fprintf(w, `{"error":{"type":"media_error","message":%q}}`, "private-provider-detail:"+strings.Repeat("x", 5000))
+						return
+					}
 					fmt.Fprintf(w, `{"id":%q,"status":"submitting"}`, requestID)
 					return
 				}
@@ -144,6 +149,18 @@ func TestStudioEmberMJDurableProtocol(t *testing.T) {
 			}
 			assert.Equal(t, constant.TaskPlatform(constant.TaskPlatformEmberMJ), task.Platform)
 			assert.Equal(t, requestID, task.GetUpstreamTaskID())
+			if scenario.submitCode >= http.StatusBadRequest {
+				assert.Equal(t, scenario.submitCode, task.PrivateData.UpstreamSubmitHTTPStatus)
+				assert.Len(t, task.PrivateData.UpstreamSubmitErrorBody, 4096)
+				assert.Contains(t, task.PrivateData.UpstreamSubmitErrorBody, "private-provider-detail")
+				publicTask, err := common.Marshal(task)
+				require.NoError(t, err)
+				assert.NotContains(t, string(publicTask), "private-provider-detail")
+				assert.NotContains(t, string(publicTask), "upstream_submit_error_body")
+			}
+			if scenario.submitCode == http.StatusBadRequest {
+				assert.Equal(t, "MJ submission rejected (HTTP 400)", task.FailReason)
+			}
 			assert.NotEqual(t, id, requestID, "upstream UUID must be scoped to the local task, not a user-chosen cross-user UUID")
 			reserved, err := model.GetUserQuota(userID, false)
 			require.NoError(t, err)

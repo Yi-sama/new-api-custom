@@ -76,8 +76,8 @@ func runVideoStudioJobs(ctx context.Context, runnerTask string) error {
 			} else {
 				job.Status, job.Error = model.StudioJobUncertain, "submission was interrupted; do not submit it again until checked"
 			}
-		} else if job.Kind == "image" && job.TaskID != "" && isStudioEmberMJTask(job) {
-			if err := syncStudioEmberMJResult(ctx, job); err != nil {
+		} else if job.Kind == "image" && job.TaskID != "" && isStudioMJTask(job) {
+			if err := syncStudioMJResult(ctx, job); err != nil {
 				common.SysError("studio MJ result " + job.ID + ": " + err.Error())
 			}
 		} else if job.Kind == "image" {
@@ -413,7 +413,11 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 		headers, _ := common.GetContextKey(c, constant.ContextKeyChannelHeaderOverride)
 		overrides, _ := headers.(map[string]interface{})
 		if job.Kind == "image" && service.UsesEmberMJProtocol(common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl), job.Model, overrides) {
-			submitStudioEmberMJ(c, job)
+			submitStudioMJ(c, job, constant.TaskPlatformEmberMJ)
+			return
+		}
+		if job.Kind == "image" && service.UsesOCMJProtocol(common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl), job.Model, overrides) {
+			submitStudioMJ(c, job, constant.TaskPlatformOCMJ)
 			return
 		}
 		if job.Kind == "video" {
@@ -423,8 +427,8 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 		}
 	})
 	router.ServeHTTP(writer, request)
-	if job.Kind == "image" && isStudioEmberMJTask(job) {
-		if err := syncStudioEmberMJResult(ctx, job); err != nil {
+	if job.Kind == "image" && isStudioMJTask(job) {
+		if err := syncStudioMJResult(ctx, job); err != nil {
 			common.SysError("studio MJ result " + job.ID + ": " + err.Error())
 		}
 		return
