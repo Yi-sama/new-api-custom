@@ -20,7 +20,8 @@ var fastModeModel = regexp.MustCompile(`^(gpt-(4o|4\.1)(-mini)?|gpt-5(\.[0-9]+)?
 
 func (info *RelayInfo) ConfigureFastMode() {
 	info.FastMode = info.TokenFastMode && setting.IsFastModeAllowedForGroup(info.UsingGroup) && info.ChannelMeta != nil &&
-		(info.ChannelType == constant.ChannelTypeOpenAI || info.ChannelType == constant.ChannelTypeCodex) &&
+		(info.ChannelType == constant.ChannelTypeOpenAI || info.ChannelType == constant.ChannelTypeCodex ||
+			info.ChannelType == constant.ChannelTypeSub2API) &&
 		(info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeResponses) &&
 		fastModeModel.MatchString(info.UpstreamModelName)
 	info.FastModeRequested = false

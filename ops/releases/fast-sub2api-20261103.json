@@ -1,0 +1,42 @@
+{
+  "release": "fast-sub2api-20261103",
+  "deployedAt": "2026-11-03T09:59:23+08:00",
+  "baseCommit": "e0b8a9c77d7c91e6c2706499016880ae4c0c9d62",
+  "previousProductionOverlayCommit": "7dfebe2bf78c6b8865b6e20f14bcdfba90417a9f",
+  "binary": {
+    "os": "linux",
+    "arch": "amd64",
+    "sha256": "e850fdee3376c68314e0f81f48c63fbde85afe51d0f150c33afa3028892f7f9d",
+    "size": 141448008,
+    "previousSha256": "25cbfb01f3fe844a7ecade9341dc02b19045037f844aa59ba5b4e7d03c6b3cff"
+  },
+  "build": {
+    "toolchain": "go1.25.5",
+    "CGO_ENABLED": "0",
+    "GOWORK": "off",
+    "GOMAXPROCS": "2",
+    "GOMEMLIMIT": "2GiB",
+    "args": ["build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-p=2", "-o", "../new-api", "."],
+    "embeddedWebFilesPreserved": 237,
+    "baseSourceArchiveSha256": "76da145cbcb55b7b9de900a176f90a724e9b05c813b053b826b55c2b8476f0ea",
+    "previousSourceOverlaySha256": "be1794f08f30986fac8b7834425f426c6496aebfc4fa448ce2564b53b7dcaf48",
+    "fastSourceOverlaySha256": "29ee6b12d8a49939cbeef4cb3da984ee2c852d30b0c6cf22d611a63956a796d1"
+  },
+  "fix": {
+    "channelType": 59,
+    "productionFiles": ["relay/common/fast_mode.go"],
+    "regressionFiles": ["relay/common/fast_mode_test.go", "relay/channel/sub2api/fast_mode_test.go"]
+  },
+  "observedRuntime": {
+    "newApiLogId": 202249,
+    "sub2ApiUsageId": 123169,
+    "requestedTier": "priority",
+    "sub2ApiServiceTier": "priority",
+    "newApiBillingRatio": 1.5,
+    "billingProtocol": "codex-oauth-priority-v1",
+    "rawResponseTier": "default",
+    "physicalAccelerationMeasured": false,
+    "ordinaryModePreserved": true
+  },
+  "rollbackCommand": "python3 -B /opt/us-whitelist/releases/fast-sub2api-20261103/deploy.py rollback"
+}
