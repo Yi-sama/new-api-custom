@@ -456,12 +456,17 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	key := ch.Key
 
 	privateData := task.PrivateData
+	if platform := task.Platform; platform == constant.TaskPlatformEmberMJ && privateData.UpstreamBaseURL != "" {
+		baseURL = privateData.UpstreamBaseURL
+		proxy = privateData.UpstreamProxy
+	}
 	if privateData.Key != "" {
 		key = privateData.Key
 	}
 	resp, err := adaptor.FetchTask(baseURL, key, map[string]any{
 		"task_id": task.GetUpstreamTaskID(),
 		"action":  task.Action,
+		"context": ctx,
 	}, proxy)
 	if err != nil {
 		return fmt.Errorf("fetchTask failed for task %s: %w", taskId, err)
@@ -490,6 +495,9 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		task.Data = t.Data
 	} else if taskResult, err = adaptor.ParseTaskResult(responseBody); err != nil {
 		return fmt.Errorf("parseTaskResult failed for task %s: %w", taskId, err)
+	}
+	if task.Platform == constant.TaskPlatformEmberMJ && taskResult.TaskID != task.GetUpstreamTaskID() {
+		return errors.New("MJ task query returned a different UUID")
 	}
 
 	task.Data = redactVideoResponseBody(responseBody)

@@ -137,6 +137,9 @@ func main() {
 	// Must run before the system task runner starts: the async_task_poll handler
 	// calls service.RunTaskPollingOnce, which needs this factory set.
 	service.GetTaskAdaptorFunc = func(platform constant.TaskPlatform) service.TaskPollingAdaptor {
+		if platform == constant.TaskPlatformEmberMJ {
+			return &service.EmberMJAdaptor{}
+		}
 		a := relay.GetTaskAdaptor(platform)
 		if a == nil {
 			return nil
