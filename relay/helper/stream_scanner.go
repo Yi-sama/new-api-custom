@@ -281,6 +281,14 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		}
 
 		if err := scanner.Err(); err != nil {
+			// Cleanup closes Body to release a blocked read after a terminal or cancel.
+			select {
+			case <-ctx.Done():
+				return
+			case <-stopChan:
+				return
+			default:
+			}
 			if err != io.EOF {
 				logger.LogError(c, "scanner error: "+err.Error())
 				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonScannerErr, err)

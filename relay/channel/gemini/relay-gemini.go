@@ -434,6 +434,59 @@ func GeminiEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	return usage, nil
 }
 
+func GeminiNanoBananaImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
+	defer service.CloseResponseBodyGracefully(resp)
+	var response dto.GeminiChatResponse
+	if err := common.DecodeJson(resp.Body, &response); err != nil {
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+	}
+	if response.PromptFeedback != nil && response.PromptFeedback.BlockReason != nil &&
+		strings.TrimSpace(*response.PromptFeedback.BlockReason) != "" {
+		reason := strings.TrimSpace(*response.PromptFeedback.BlockReason)
+		common.SetContextKey(c, constant.ContextKeyAdminRejectReason, "gemini_block_reason="+reason)
+		return nil, types.NewOpenAIError(errors.New("request blocked by Gemini API: "+reason),
+			types.ErrorCodePromptBlocked, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+	}
+
+	request, ok := info.Request.(*dto.ImageRequest)
+	if !ok {
+		return nil, types.NewError(errors.New("missing image request"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+	result := dto.ImageResponse{
+		Created: common.GetTimestamp(),
+		Data:    make([]dto.ImageData, 0, 1),
+	}
+	for _, candidate := range response.Candidates {
+		for _, part := range candidate.Content.Parts {
+			image := part.InlineData
+			if part.Thought || image == nil || image.Data == "" || !strings.HasPrefix(image.MimeType, "image/") {
+				continue
+			}
+			data := dto.ImageData{}
+			if request.ResponseFormat == "url" {
+				data.Url = "data:" + image.MimeType + ";base64," + image.Data
+			} else {
+				data.B64Json = image.Data
+			}
+			result.Data = append(result.Data, data)
+		}
+	}
+	if len(result.Data) == 0 {
+		return nil, types.NewOpenAIError(errors.New("Gemini returned no generated image"),
+			types.ErrorCodeEmptyResponse, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+	}
+	body, err := common.Marshal(result)
+	if err != nil {
+		return nil, types.NewError(err, types.ErrorCodeBadResponseBody, types.ErrOptionWithSkipRetry())
+	}
+	usage := buildUsageFromGeminiResponse(c, info, &response)
+	patchGeminiZeroCompletionUsage(c, info, &usage, geminiResponseUsageText(&response), len(result.Data))
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.WriteHeader(resp.StatusCode)
+	_, _ = c.Writer.Write(body)
+	return &usage, nil
+}
+
 func GeminiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	responseBody, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {

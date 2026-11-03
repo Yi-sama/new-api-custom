@@ -52,6 +52,7 @@ import type {
   WaffoPayMethod,
 } from '../types'
 import { CreemProductsSection } from './creem-products-section'
+import { LiandongShopLink } from './liandong-shop-link'
 
 interface RechargeFormCardProps {
   topupInfo: TopupInfo | null
@@ -551,6 +552,7 @@ export function RechargeFormCard({
               </a>
             </p>
           )}
+          <LiandongShopLink />
         </div>
       ) : (
         <Alert className='border-t'>

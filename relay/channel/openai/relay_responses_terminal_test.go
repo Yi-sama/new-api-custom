@@ -25,12 +25,14 @@ func TestOaiResponsesStreamHandlerTerminatesAtTerminalEvent(t *testing.T) {
 	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
 
 	for _, tc := range []struct {
-		event  string
-		failed bool
+		event        string
+		failed       bool
+		leadingError bool
 	}{
 		{event: "response.completed"},
 		{event: "response.done"},
 		{event: "response.failed", failed: true},
+		{event: "response.failed", failed: true, leadingError: true},
 		{event: "response.incomplete", failed: true},
 		{event: "response.cancelled", failed: true},
 		{event: "response.canceled", failed: true},
@@ -76,7 +78,13 @@ func TestOaiResponsesStreamHandlerTerminatesAtTerminalEvent(t *testing.T) {
 				defer close(done)
 				usage, apiErr = OaiResponsesStreamHandler(c, info, resp)
 			}()
-			_, err = io.WriteString(writer, "data: "+string(payload)+"\n\n")
+			wire := "data: " + string(payload) + "\n\n"
+			expectedFrames := 1
+			if tc.leadingError {
+				wire = "event: error\ndata: {\"type\":\"error\",\"code\":\"upstream_stream_read_error\",\"message\":\"Upstream response stream was interrupted\",\"param\":null}\n\n" + wire
+				expectedFrames++
+			}
+			_, err = io.WriteString(writer, wire)
 			require.NoError(t, err)
 
 			returnedBeforeEOF := false
@@ -91,7 +99,7 @@ func TestOaiResponsesStreamHandlerTerminatesAtTerminalEvent(t *testing.T) {
 			require.Nil(t, apiErr, "a forwarded terminal must not cause generic JSON or a gateway replay")
 			require.NotNil(t, info.StreamStatus)
 			assert.Equal(t, tc.failed, info.StreamStatus.HasErrors())
-			assert.Equal(t, 1, strings.Count(recorder.Body.String(), "data: "))
+			assert.Equal(t, expectedFrames, strings.Count(recorder.Body.String(), "data: "))
 			assert.Contains(t, recorder.Body.String(), "data: "+string(payload)+"\n\n")
 			if !tc.failed {
 				require.NotNil(t, usage)

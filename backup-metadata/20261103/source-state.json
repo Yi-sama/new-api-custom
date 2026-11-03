@@ -1,0 +1,188 @@
+{
+  "observed_at": "2026-11-03T12:07:55.035299+00:00",
+  "host": "ser021360749320",
+  "scope": "source backup only; no deploy, build, restart, secrets, or databases",
+  "source_hash_verification": "SHA-256 of published source overlays and manifest files",
+  "base_commit": "25ec2a2719d64fe4abac743f5648723cd849bf24",
+  "live_containers": {
+    "new-api": {
+      "id": "631a322c53c74e0f17b70e854d3b1f5d7553438885bbb950182e89611b9ff908",
+      "started": "2026-11-03T11:31:53.811748686Z",
+      "state": "running",
+      "binary": "/opt/us-whitelist/releases/assistant-password-reset-20261103/new-api",
+      "binary_sha256": "210b965ee747749ebc15ec0322aeb8ebe00817d8c370fe46d03291a2ddcf8e37"
+    },
+    "new-api-accrual": {
+      "id": "802f84a87fcb8fee6168576aba310ed948a808596cccbf8d3c16e93ce8400c37",
+      "started": "2026-11-03T11:31:25.472208551Z",
+      "state": "running",
+      "binary": "/opt/us-whitelist/releases/assistant-password-reset-20261103/new-api",
+      "binary_sha256": "210b965ee747749ebc15ec0322aeb8ebe00817d8c370fe46d03291a2ddcf8e37"
+    }
+  },
+  "source_files_sha256": {
+    "relay/channel/gemini/adaptor.go": "9f7cdae1f29c33e4d5e7e8d2062f6081ce439107cbd54a604a1e2485d88ffb97",
+    "relay/channel/gemini/relay-gemini.go": "26a440bfbb01e6203e83f658285ddc82e4b1d6ef630e93ea0ce8fe5d0253f00d",
+    "relay/channel/gemini/nano_banana_image_test.go": "b5a9fbca7d1bd404a88abe45f97e5fad1adbe30c95c21e9f95c3c3d37d85be9f",
+    "relay/helper/stream_scanner.go": "37c30158fdc5c94beb196bb4152095ab34d7d44a7c4f0cd81e0f5a6eaa13d127",
+    "relay/helper/stream_scanner_cleanup_test.go": "b47bad14ba47967abd08e3b62c1b0259260c006e91904fb52023b472ea808dd8",
+    "relay/channel/openai/relay_responses_terminal_test.go": "75c43a93a9f16fb086c24d99d291cd2e144934436423537156ce746b719973bc",
+    "router/assistant-auth.go": "e3fa2ba7f75750dfc688537fbf79227d701458fb3ab0a01f2c8930f4521b2b15",
+    "middleware/assistant-auth-rate-limit.go": "0051621f9e3197ae806de4bb05806245c5625fc93b9050cee7636c8923d1f4fa",
+    "model/assistant_password_reset.go": "ab0f227b32951c53115ece59f228c97a7040e52e1e53c0135dc674dedf101d3e",
+    "web/src/features/wallet/components/__tests__/liandong-shop-link.test.tsx": "82f5bb6a24e94786c78362ee92c54a4bc14af6a4ed4e6ae537ee1034e0e261cb",
+    "web/src/features/wallet/components/liandong-shop-link.tsx": "9657b74126e5a354b08d25ad23a65d5c078c45a28a4aa68ac2f3deea31daf379",
+    "web/src/features/wallet/components/recharge-form-card.tsx": "b2faf39061b73d7b3e595319cd4ee87cd5ec368be79665ab0a03193a94ced79f",
+    "web/src/i18n/locales/en.json": "3319be5f599940b2b8b57b11413bfe85413b7f09cde58a8f8c227b53b2b19cc4",
+    "web/src/i18n/locales/zh.json": "3c6a9bd2b5a09305fc71f7b864341b4509d952d7e0480621e08a7fec0f7bdb60",
+    "web/rsbuild.shop.config.ts": "a84a383e6b651e942f6b30b6b1b3be7b8938eb73cd2913812a67cfbd4392e9a2"
+  },
+  "shop_frontend_source_paths": [
+    "web/src/features/wallet/components/__tests__/liandong-shop-link.test.tsx",
+    "web/src/features/wallet/components/liandong-shop-link.tsx",
+    "web/src/features/wallet/components/recharge-form-card.tsx",
+    "web/src/i18n/locales/en.json",
+    "web/src/i18n/locales/zh.json",
+    "web/rsbuild.shop.config.ts"
+  ],
+  "published_manifests": {
+    "wallet": {
+      "release": "settled-balance-20261103-r2",
+      "sourceCommit": "25ec2a2719d64fe4abac743f5648723cd849bf24",
+      "baseCommit": "9dc4fd2",
+      "binarySha256": "9d51eaaaeede869e3d339d066474d98d713ae5acb282964da13142f97cab8380",
+      "binarySize": 141510720,
+      "buildEnvironment": {
+        "GOOS": "linux",
+        "GOARCH": "amd64",
+        "GOAMD64": "v1",
+        "CGO_ENABLED": "0",
+        "GOWORK": "off",
+        "GOMAXPROCS": "2",
+        "GOMEMLIMIT": "2GiB"
+      },
+      "buildArgs": [
+        "build",
+        "-mod=readonly",
+        "-trimpath",
+        "-buildvcs=false",
+        "-p=2",
+        "-o",
+        "../new-api",
+        "."
+      ],
+      "changedProductionFiles": {
+        "model/main.go": "74f0121d40faa88fde476cc1aea789440e5db0708561fa336761b78c5dfa9664",
+        "model/subscription_rollover.go": "5ff4e985bd07d33e931555f4b8d81daf154915cc1f138da6a7df60a6c020d9b9",
+        "model/wallet_preconsume.go": "f269017cb2b54d872f843b18752131176884e2564fc4bdd17980b4cc935f0830",
+        "service/billing_session.go": "1fb327c7e2af3d62695be26178fdf894eba72e6b4e399073783bb862a94d0712",
+        "service/funding_source.go": "e94f0c4b355fd56e6578b7d69081f13f70360ba1457f687603af26b5057498dc",
+        "service/subscription_reset_task.go": "f2af45a240bd73e8a083f963b1e5d4202b8474d5ade2fd109b7824d094258eb0",
+        "controller/user.go": "5483f74d171533fbff549b4eb6c189221b0c70d4e20a93158f7951f945afb285",
+        "controller/wallet_balance.go": "35c0eda6ae5cd218ceb10d2926e246c0e9c7a8ed7a2a899d26f7df90edf47b6e",
+        "router/api-router.go": "67265bc4c8093c7ccaf6ec7561fcf95d248ee6f3d84558a141660a79b62056dd"
+      },
+      "tests": {
+        "model": "pass",
+        "service": "pass except baseline cache stats suite",
+        "controller": "pass except two baseline model-list and topup tests",
+        "assistant": "120 passed; no skipped"
+      },
+      "notes": [
+        "No pricing or Fast multiplier changes",
+        "Wallet precharges and their display records commit in the same transaction",
+        "Existing production web assets preserved"
+      ],
+      "sourceOverlay": "wallet-source-overlay.tar.gz",
+      "baseSourceArchive": "/opt/us-whitelist/releases/group-display-names-20261102-183449/source.tar.gz",
+      "previousOverlays": [
+        "/opt/us-whitelist/releases/mj-uuyue-20261102/mj-source-overlay.tar.gz",
+        "/opt/us-whitelist/releases/fast-sub2api-20261103/fast-source-overlay.tar.gz"
+      ],
+      "sourceOverlaySha256": "721ebeac9b1993dc4be282827b7665cc5ede71f510bdfaeb906af2012e962cc8",
+      "preservedConcurrentRelease": "mj-oc-async-20261103",
+      "previousBinarySha256": "6d998d706abaf43c79530f08c839a454a8b88b3389f34358ee48e61db96a368f"
+    },
+    "gemini": {
+      "release": "nano-banana-gemini-20261103-r2",
+      "sourceCommit": "25ec2a2719d64fe4abac743f5648723cd849bf24",
+      "previousRelease": "nano-banana-gemini-20261103-r1",
+      "previousBinarySha256": "1659f6b10236a3f292b192a9c9194de6ed32ac7ca5f1b0504444e549d45f165a",
+      "binarySha256": "c5a4bd1640b194300f8df2d3e9c9c87e1e600db2c7395ba7841586528ba00cf6",
+      "binarySize": 141522501,
+      "buildEnvironment": {
+        "GOMAXPROCS": "2",
+        "GOOS": "linux",
+        "GOARCH": "amd64",
+        "CGO_ENABLED": "0",
+        "GOAMD64": "v1",
+        "GOWORK": "off",
+        "go": "1.25.5",
+        "GOMEMLIMIT": "2GiB"
+      },
+      "buildArgs": [
+        "build",
+        "-mod=readonly",
+        "-trimpath",
+        "-buildvcs=false",
+        "-p=2",
+        "-o",
+        "../nano-banana-new-api-r2",
+        "."
+      ],
+      "changedFiles": {
+        "relay/channel/gemini/adaptor.go": "9f7cdae1f29c33e4d5e7e8d2062f6081ce439107cbd54a604a1e2485d88ffb97",
+        "relay/channel/gemini/relay-gemini.go": "26a440bfbb01e6203e83f658285ddc82e4b1d6ef630e93ea0ce8fe5d0253f00d",
+        "relay/channel/gemini/nano_banana_image_test.go": "b5a9fbca7d1bd404a88abe45f97e5fad1adbe30c95c21e9f95c3c3d37d85be9f"
+      },
+      "sourceOverlay": "nano-banana-source-overlay-r2.tar.gz",
+      "sourceOverlaySha256": "8ce45e291ce94a210862f9f903b9b868ea05fa7a2dba5464f08bf953dc803d64",
+      "tests": {
+        "gemini": "pass",
+        "relayCommon": "pass",
+        "relayConstant": "pass",
+        "relayHelper": "pass"
+      },
+      "notes": [
+        "Existing web assets and all prior source changes preserved",
+        "No database or pricing changes",
+        "Channel 68 remains Gemini",
+        "Fix empty promptFeedback.blockReason false-positive demonstrated by real gateway test"
+      ]
+    },
+    "stream": {
+      "frontendChanged": false,
+      "serverBuild": false,
+      "binarySha256": "eb3fcdc6b97ffc532ceb895c2a00288499f426db7ae682a4837d92aa2000aa63",
+      "databaseMigration": false,
+      "release": "stream-terminal-20261103-r2",
+      "baselineSha256": "c5a4bd1640b194300f8df2d3e9c9c87e1e600db2c7395ba7841586528ba00cf6",
+      "changedProductionFiles": {
+        "relay/helper/stream_scanner.go": "37c30158fdc5c94beb196bb4152095ab34d7d44a7c4f0cd81e0f5a6eaa13d127"
+      },
+      "preservedConcurrentSources": {
+        "relay/channel/gemini/adaptor.go": "9f7cdae1f29c33e4d5e7e8d2062f6081ce439107cbd54a604a1e2485d88ffb97",
+        "relay/channel/gemini/relay-gemini.go": "26a440bfbb01e6203e83f658285ddc82e4b1d6ef630e93ea0ce8fe5d0253f00d",
+        "relay/channel/gemini/nano_banana_image_test.go": "b5a9fbca7d1bd404a88abe45f97e5fad1adbe30c95c21e9f95c3c3d37d85be9f"
+      },
+      "sourceCommit": "25ec2a2719d64fe4abac743f5648723cd849bf24",
+      "preservedConcurrentRelease": "nano-banana-gemini-20261103-r2"
+    },
+    "assistant_password_reset": {
+      "release": "assistant-password-reset-20261103",
+      "sourceCommit": "25ec2a2719d64fe4abac743f5648723cd849bf24",
+      "previousBinarySha256": "eb3fcdc6b97ffc532ceb895c2a00288499f426db7ae682a4837d92aa2000aa63",
+      "baselineSha256": "eb3fcdc6b97ffc532ceb895c2a00288499f426db7ae682a4837d92aa2000aa63",
+      "binarySha256": "210b965ee747749ebc15ec0322aeb8ebe00817d8c370fe46d03291a2ddcf8e37",
+      "changedSources": {
+        "router/assistant-auth.go": "e3fa2ba7f75750dfc688537fbf79227d701458fb3ab0a01f2c8930f4521b2b15",
+        "middleware/assistant-auth-rate-limit.go": "0051621f9e3197ae806de4bb05806245c5625fc93b9050cee7636c8923d1f4fa",
+        "model/assistant_password_reset.go": "ab0f227b32951c53115ece59f228c97a7040e52e1e53c0135dc674dedf101d3e"
+      },
+      "databaseMigration": false,
+      "frontendChanged": false,
+      "serverBuild": false
+    }
+  },
+  "verification_limit": "No recompilation; base commit and overlay hashes match deployment records."
+}

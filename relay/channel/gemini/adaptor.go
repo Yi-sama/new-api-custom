@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/constant"
@@ -61,8 +62,9 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
-	if !strings.HasPrefix(info.UpstreamModelName, "imagen") {
-		return nil, errors.New("not supported model for image generation, only imagen models are supported")
+	nanoBanana := strings.HasPrefix(info.UpstreamModelName, "nano-banana")
+	if !nanoBanana && !strings.HasPrefix(info.UpstreamModelName, "imagen") {
+		return nil, errors.New("image generation requires an imagen or nano-banana model")
 	}
 
 	// convert size to aspect ratio but allow user to specify aspect ratio
@@ -72,7 +74,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		if strings.Contains(size, ":") {
 			aspectRatio = size
 		} else {
-			switch size {
+			switch strings.ToLower(size) {
 			case "256x256", "512x512", "1024x1024":
 				aspectRatio = "1:1"
 			case "1536x1024":
@@ -85,6 +87,66 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 				aspectRatio = "16:9"
 			}
 		}
+	}
+
+	if nanoBanana {
+		if info.RelayMode == constant.RelayModeImagesEdits || len(request.Image) > 0 ||
+			len(request.Images) > 0 || len(request.Mask) > 0 {
+			return nil, errors.New("nano-banana image editing is not supported by this adapter")
+		}
+		if lo.FromPtrOr(request.N, uint(1)) != 1 {
+			return nil, errors.New("nano-banana image generation requires n=1")
+		}
+		if lo.FromPtrOr(request.Stream, false) {
+			return nil, errors.New("nano-banana Images streaming is not supported")
+		}
+		switch request.ResponseFormat {
+		case "", "b64_json", "url":
+		default:
+			return nil, errors.New("response_format must be b64_json or url")
+		}
+
+		imageSize := "1K"
+		switch strings.ToUpper(request.Quality) {
+		case "", "AUTO", "STANDARD", "LOW", "MEDIUM", "1K":
+		case "HD", "HIGH", "2K":
+			imageSize = "2K"
+		case "4K":
+			imageSize = "4K"
+		default:
+			return nil, errors.New("unsupported nano-banana image quality")
+		}
+		switch strings.ToUpper(size) {
+		case "", "AUTO", "1K", "256X256", "512X512", "1024X1024",
+			"1536X1024", "1024X1536", "1024X1792", "1792X1024":
+		case "2K", "2048X2048":
+			imageSize = "2K"
+		case "4K", "4096X4096":
+			imageSize = "4K"
+		default:
+			switch size {
+			case "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9":
+			default:
+				return nil, errors.New("unsupported nano-banana image size or aspect ratio")
+			}
+		}
+		imageConfig, err := common.Marshal(map[string]string{
+			"aspectRatio": aspectRatio,
+			"imageSize":   imageSize,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return dto.GeminiChatRequest{
+			Contents: []dto.GeminiChatContent{{
+				Role:  "user",
+				Parts: []dto.GeminiPart{{Text: request.Prompt}},
+			}},
+			GenerationConfig: dto.GeminiChatGenerationConfig{
+				ResponseModalities: []string{"TEXT", "IMAGE"},
+				ImageConfig:        imageConfig,
+			},
+		}, nil
 	}
 
 	// build gemini imagen request
@@ -276,6 +338,11 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 
 	if strings.HasPrefix(info.UpstreamModelName, "imagen") {
 		return GeminiImageHandler(c, info, resp)
+	}
+
+	if info.RelayMode == constant.RelayModeImagesGenerations &&
+		strings.HasPrefix(info.UpstreamModelName, "nano-banana") {
+		return GeminiNanoBananaImageHandler(c, info, resp)
 	}
 
 	// check if the model is an embedding model

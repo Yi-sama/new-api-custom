@@ -6,3 +6,7 @@ import "github.com/gin-gonic/gin"
 func AssistantAuthRateLimit() gin.HandlerFunc {
 	return rateLimitFactory(10, 60, "yisama-assistant-auth:")
 }
+
+func AssistantPasswordResetVerificationRateLimit() gin.HandlerFunc {
+	return rateLimitFactory(2, 60, "yisama-assistant-password-reset:")
+}

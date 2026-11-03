@@ -1,5 +1,7 @@
 {
   "translation": {
+    "My Liandong Shop": "我的链动小铺",
+    "Explore my shop": "逛逛小铺，发现更多好物",
     "Group display names": "分组显示名",
     "Expected a JSON object mapping group identifiers to display names": "请输入分组标识到显示名的 JSON 字符串映射",
     "QQ Binding": "QQ 绑定",
