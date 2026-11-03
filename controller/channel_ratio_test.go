@@ -117,7 +117,7 @@ func TestChannelRatioRetryReservationAndWalletSettlement(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, sqlDB.Close())
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.WalletPreConsumeRecord{}))
 	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{"channel-retry-test":0.01}`))
 
 	for i, scenario := range []struct {

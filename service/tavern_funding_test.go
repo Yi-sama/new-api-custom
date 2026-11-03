@@ -26,7 +26,7 @@ func setupTavernFunding(t *testing.T, wallet int, preference string) (*gin.Conte
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.TavernCredit{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.WalletPreConsumeRecord{}, &model.TavernCredit{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
 	model.DB, model.LOG_DB = db, db
 	t.Cleanup(func() {
 		model.DB, model.LOG_DB = previousDB, previousLogDB

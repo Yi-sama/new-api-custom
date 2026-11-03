@@ -33,7 +33,7 @@ func setupImageStudioSession(t *testing.T, role int) (service.AuthIdentity, *mod
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Log{}, &model.ImageStudioCredit{}, &model.Option{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.WalletPreConsumeRecord{}, &model.UserSession{}, &model.Log{}, &model.ImageStudioCredit{}, &model.Option{}))
 	model.DB, model.LOG_DB = db, db
 	common.RedisEnabled = false
 	common.SessionSecret = "image-studio-test-session-secret"

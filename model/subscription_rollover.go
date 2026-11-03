@@ -110,6 +110,14 @@ func ResizeSubscriptionPreConsume(requestID string, userID int, amount int64, al
 		if charged.RowsAffected != 1 {
 			return fmt.Errorf("%w: wallet quota insufficient", ErrSubscriptionFundingInsufficient)
 		}
+		if !settling && amount > 0 {
+			if err := tx.Create(&WalletPreConsumeRecord{
+				RequestId: requestID, UserId: userID, Quota: amount, Status: walletPreConsumePending,
+				CreatedAt: now, UpdatedAt: now,
+			}).Error; err != nil {
+				return err
+			}
+		}
 		walletCharged = true
 		if err := postConsumeUserSubscriptionDeltaTx(tx, sub.Id, -record.PreConsumed, now); err != nil {
 			return err

@@ -87,3 +87,28 @@ func TestTokenFastModeWalletReserveSettleAndRefund(t *testing.T) {
 		})
 	}
 }
+
+func TestWalletExcessPrechargeReturnsAtSettlement(t *testing.T) {
+	truncate(t)
+	const userID = 731
+	seedUser(t, userID, 500000)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	info := &relaycommon.RelayInfo{
+		UserId: userID, IsPlayground: true, ForcePreConsume: true,
+		UserSetting: dto.UserSetting{BillingPreference: "wallet_only"},
+	}
+
+	require.Nil(t, PreConsumeBilling(ctx, 110000, info))
+	reserved, err := model.GetUserById(userID, false)
+	require.NoError(t, err)
+	assert.Equal(t, 390000, reserved.Quota, "a $0.22 precharge temporarily leaves $0.78")
+
+	require.NoError(t, SettleBilling(ctx, info, 95000))
+	settled, err := model.GetUserById(userID, false)
+	require.NoError(t, err)
+	assert.Equal(t, 405000, settled.Quota, "a $0.19 final charge returns $0.03, leaving $0.81")
+	require.NoError(t, SettleBilling(ctx, info, 95000))
+	settled, err = model.GetUserById(userID, false)
+	require.NoError(t, err)
+	assert.Equal(t, 405000, settled.Quota, "repeating settlement must not refund twice")
+}

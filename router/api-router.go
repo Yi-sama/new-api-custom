@@ -101,6 +101,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/sessions/revoke-others", middleware.DisableCache(), controller.RevokeOtherLoginSessions)
 				selfRoute.GET("/self/groups", controller.GetUserGroups)
 				selfRoute.GET("/self", controller.GetSelf)
+				selfRoute.GET("/self/balance", middleware.DisableCache(), controller.GetSelfWalletBalance)
 				selfRoute.GET("/qq-binding", middleware.DisableCache(), controller.GetQQBenefitStatus)
 				selfRoute.POST("/qq-binding/code", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("qq-binding"), middleware.DisableCache(), controller.CreateQQBenefitCode)
 				selfRoute.GET("/models", controller.GetUserModels)

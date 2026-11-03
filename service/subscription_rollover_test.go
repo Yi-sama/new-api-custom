@@ -57,6 +57,15 @@ func TestSubscriptionRolloverReserveAndSettle(t *testing.T) {
 					require.NoError(t, session.Reserve(30))
 					assert.Equal(t, 30, session.GetPreConsumedQuota())
 				}
+				balance, err := model.GetWalletBalance(info.UserId)
+				require.NoError(t, err)
+				assert.EqualValues(t, 5000, balance.SettledQuota)
+				if reserve && !next {
+					assert.EqualValues(t, 30, balance.PendingQuota)
+					assert.EqualValues(t, 1, balance.PendingRequestCount)
+				} else {
+					assert.Zero(t, balance.PendingQuota)
+				}
 				require.NoError(t, session.Settle(35))
 				require.NoError(t, session.Settle(35), "settlement must be idempotent")
 				assert.False(t, session.NeedsRefund())
@@ -74,6 +83,11 @@ func TestSubscriptionRolloverReserveAndSettle(t *testing.T) {
 					assert.Zero(t, info.SubscriptionId)
 				}
 				assert.Equal(t, 965, getTokenRemainQuota(t, info.TokenId))
+				balance, err = model.GetWalletBalance(info.UserId)
+				require.NoError(t, err)
+				assert.Zero(t, balance.PendingRequestCount)
+				assert.Zero(t, balance.PendingQuota)
+				assert.EqualValues(t, getUserQuota(t, info.UserId), balance.SettledQuota)
 			})
 		}
 	}
@@ -94,6 +108,9 @@ func TestSubscriptionRolloverRefundsEntireMovedReservation(t *testing.T) {
 				assert.Zero(t, getSubscriptionUsed(t, 620202))
 			}
 			assert.Equal(t, 5000, getUserQuota(t, info.UserId))
+			balance, err := model.GetWalletBalance(info.UserId)
+			require.NoError(t, err)
+			assert.Equal(t, model.WalletBalance{Quota: 5000, SettledQuota: 5000}, balance)
 		})
 	}
 }

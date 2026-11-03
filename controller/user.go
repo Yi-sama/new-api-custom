@@ -492,6 +492,15 @@ func GetSelf(c *gin.Context) {
 		return
 	}
 	responseData := buildSelfUserData(user)
+	balance, err := model.GetWalletBalance(id)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	responseData["quota"] = balance.Quota
+	responseData["settled_quota"] = balance.SettledQuota
+	responseData["pending_quota"] = balance.PendingQuota
+	responseData["pending_request_count"] = balance.PendingRequestCount
 	// The authenticated role is loaded from GetUserCache. It should equal the
 	// row role, but use it for capabilities so GetSelf and login/refresh remain
 	// consistent with the authorization decision made for this request.

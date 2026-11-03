@@ -24,7 +24,7 @@ func setupAccrualBilling(t *testing.T, start, end int64, policy, status string, 
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
 	require.NoError(t, db.AutoMigrate(
-		&model.User{}, &model.SubscriptionPlan{},
+		&model.User{}, &model.WalletPreConsumeRecord{}, &model.SubscriptionPlan{},
 		&model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{},
 	))
 	model.DB, model.LOG_DB = db, db

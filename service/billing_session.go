@@ -46,7 +46,8 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		return nil
 	}
 	delta := actualQuota - s.preConsumedQuota
-	if delta == 0 && s.funding.Source() != BillingSourceTavern && s.funding.Source() != BillingSourceImageStudio {
+	if delta == 0 && s.funding.Source() != BillingSourceTavern && s.funding.Source() != BillingSourceImageStudio &&
+		s.funding.Source() != BillingSourceWallet {
 		s.settled = true
 		return nil
 	}
@@ -71,7 +72,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	// 2) 调整令牌额度
 	var tokenErr error
-	if !s.relayInfo.IsPlayground {
+	if !s.relayInfo.IsPlayground && delta != 0 {
 		if delta > 0 {
 			tokenErr = model.DecreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, delta)
 		} else {
@@ -299,7 +300,13 @@ func (s *BillingSession) reserveFunding(delta int) error {
 		// 全额无条件扣减，余额不足的部分记为欠费（余额可为负），不中断请求，
 		// 保证日志记录的预扣额度与用户余额的实际变动始终对账一致。
 		// DecreaseUserQuota 仅在数据库错误时失败。
-		if err := model.DecreaseUserQuota(funding.userId, delta, false); err != nil {
+		var err error
+		if funding.requestId != "" {
+			err = model.AdjustWalletPreConsume(funding.requestId, funding.userId, delta)
+		} else {
+			err = model.DecreaseUserQuota(funding.userId, delta, false)
+		}
+		if err != nil {
 			return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 		}
 		funding.consumed += delta
@@ -323,7 +330,13 @@ func (s *BillingSession) reserveFunding(delta int) error {
 func (s *BillingSession) rollbackFundingReserve(delta int) {
 	switch funding := s.funding.(type) {
 	case *WalletFunding:
-		if err := model.IncreaseUserQuota(funding.userId, delta, false); err != nil {
+		var err error
+		if funding.requestId != "" {
+			err = model.AdjustWalletPreConsume(funding.requestId, funding.userId, -delta)
+		} else {
+			err = model.IncreaseUserQuota(funding.userId, delta, false)
+		}
+		if err != nil {
 			common.SysLog("error rolling back wallet funding reserve: " + err.Error())
 		} else {
 			funding.consumed -= delta
@@ -483,10 +496,13 @@ func newRegularBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, 
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		relayInfo.UserQuota = userQuota
+		if relayInfo.RequestId == "" {
+			relayInfo.RequestId = common.GetUUID()
+		}
 
 		session := &BillingSession{
 			relayInfo: relayInfo,
-			funding:   &WalletFunding{userId: relayInfo.UserId},
+			funding:   &WalletFunding{userId: relayInfo.UserId, requestId: relayInfo.RequestId},
 		}
 		if apiErr := session.preConsume(c, preConsumedQuota); apiErr != nil {
 			return nil, apiErr
