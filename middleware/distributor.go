@@ -41,6 +41,10 @@ func Distribute() func(c *gin.Context) {
 		channelId, ok := common.GetContextKey(c, constant.ContextKeyTokenSpecificChannelId)
 		modelRequest, shouldSelectChannel, err := getModelRequest(c)
 		if err != nil {
+			if common.IsRequestBodyTooLargeError(err) {
+				abortWithOpenAiMessage(c, http.StatusRequestEntityTooLarge, err.Error(), types.ErrorCodeReadRequestBodyFailed)
+				return
+			}
 			abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
 			return
 		}
@@ -377,6 +381,9 @@ func getModelFromRequest(c *gin.Context) (*ModelRequest, error) {
 	if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "application/json") {
 		modelRequest, err := getModelFromJSONBody(c)
 		if err != nil {
+			if common.IsRequestBodyTooLargeError(err) {
+				return nil, err
+			}
 			return nil, errors.New(i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
 		}
 		return modelRequest, nil
@@ -385,6 +392,9 @@ func getModelFromRequest(c *gin.Context) (*ModelRequest, error) {
 	var modelRequest ModelRequest
 	err := common.UnmarshalBodyReusable(c, &modelRequest)
 	if err != nil {
+		if common.IsRequestBodyTooLargeError(err) {
+			return nil, err
+		}
 		return nil, errors.New(i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
 	}
 	return &modelRequest, nil
@@ -449,6 +459,9 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			midjourneyRequest := taskdto.MidjourneyRequest{}
 			err = common.UnmarshalBodyReusable(c, &midjourneyRequest)
 			if err != nil {
+				if common.IsRequestBodyTooLargeError(err) {
+					return nil, false, err
+				}
 				return nil, false, errors.New(i18n.T(c, i18n.MsgDistributorInvalidMidjourney, map[string]any{"Error": err.Error()}))
 			}
 			midjourneyModel, mjErr, success := service.GetMjRequestModel(relayMode, &midjourneyRequest)
@@ -556,6 +569,9 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 		contentType := c.ContentType()
 		if slices.Contains([]string{gin.MIMEPOSTForm, gin.MIMEMultipartPOSTForm}, contentType) {
 			req, err := getModelFromRequest(c)
+			if common.IsRequestBodyTooLargeError(err) {
+				return nil, false, err
+			}
 			if err == nil && req.Model != "" {
 				modelRequest.Model = req.Model
 			}
@@ -568,14 +584,22 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			modelRequest.Model = common.GetStringIfEmpty(modelRequest.Model, "tts-1")
 		} else if strings.HasPrefix(c.Request.URL.Path, "/v1/audio/translations") {
 			// 先尝试从请求读取
-			if req, err := getModelFromRequest(c); err == nil && req.Model != "" {
+			req, err := getModelFromRequest(c)
+			if common.IsRequestBodyTooLargeError(err) {
+				return nil, false, err
+			}
+			if err == nil && req.Model != "" {
 				modelRequest.Model = req.Model
 			}
 			modelRequest.Model = common.GetStringIfEmpty(modelRequest.Model, "whisper-1")
 			relayMode = relayconstant.RelayModeAudioTranslation
 		} else if strings.HasPrefix(c.Request.URL.Path, "/v1/audio/transcriptions") {
 			// 先尝试从请求读取
-			if req, err := getModelFromRequest(c); err == nil && req.Model != "" {
+			req, err := getModelFromRequest(c)
+			if common.IsRequestBodyTooLargeError(err) {
+				return nil, false, err
+			}
+			if err == nil && req.Model != "" {
 				modelRequest.Model = req.Model
 			}
 			modelRequest.Model = common.GetStringIfEmpty(modelRequest.Model, "whisper-1")

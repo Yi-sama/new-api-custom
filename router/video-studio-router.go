@@ -86,9 +86,18 @@ func serveVideoStudioStatic(c *gin.Context) {
 		return
 	}
 	filePath := filepath.Join(distDir, filepath.FromSlash(strings.TrimPrefix(cleanPath, "/")))
-	if info, err := os.Stat(filePath); err == nil && info.Mode().IsRegular() {
-		c.File(filePath)
-		return
+	if info, err := os.Stat(filePath); err != nil || !info.Mode().IsRegular() {
+		if strings.HasPrefix(cleanPath, "/assets/") || strings.HasPrefix(cleanPath, "/plugins/") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		filePath = filepath.Join(distDir, "index.html")
 	}
-	c.File(filepath.Join(distDir, "index.html"))
+	if strings.EqualFold(filepath.Ext(filePath), ".html") {
+		// Ingress rewrites entry scripts without changing the source file's mtime.
+		c.Header("Cache-Control", "no-store")
+		c.Request.Header.Del("If-Modified-Since")
+		c.Request.Header.Del("If-None-Match")
+	}
+	c.File(filePath)
 }

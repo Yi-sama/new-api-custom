@@ -12,6 +12,7 @@ import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import { imageSizePresets, inferMediaScale } from "@/lib/media-size";
 import type { ReferenceImage } from "@/types/image";
+import { assertMjPrompt } from "@/lib/mj-prompt";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
@@ -730,6 +731,7 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
 export const requestGeneration = withStudioAccountRefresh(async (config: AiConfig, prompt: string, options?: RequestOptions) => {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     if (managedStudio) {
+        assertMjPrompt(requestConfig.model, withSystemPrompt(requestConfig, prompt));
         const job = await submitStudioJob("/jobs/images/generations", JSON.stringify({
             model: requestConfig.model,
             prompt: withSystemPrompt(requestConfig, prompt),
@@ -800,6 +802,7 @@ export const requestEdit = withStudioAccountRefresh(async (config: AiConfig, pro
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
     if (managedStudio) {
+        assertMjPrompt(requestConfig.model, withSystemPrompt(requestConfig, requestPrompt));
         const formData = new FormData();
         formData.set("model", requestConfig.model);
         formData.set("prompt", withSystemPrompt(requestConfig, requestPrompt));

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { type CanvasTheme } from "@/lib/canvas-theme";
+import { isMjModel, MJ_PROMPT_LIMIT } from "@/lib/mj-prompt";
 import { getManagedStudioParameterProfile } from "@/lib/studio-model-parameters";
 import type { AiConfig } from "@/stores/use-config-store";
 
@@ -25,6 +26,7 @@ export function ManagedImageSettings(props: ManagedSettingsProps<ManagedImageSet
             <ParameterChoice label={t("settingsPanels.image.aspectRatio")} options={profile?.aspect_ratios} value={props.config.studioAspectRatio} theme={props.theme} onChange={(value) => props.onConfigChange("studioAspectRatio", value)} />
             <ParameterChoice label={t("settingsPanels.image.count")} options={profile?.counts} value={props.config.count} theme={props.theme} onChange={(value) => props.onConfigChange("count", value)} />
             {!profile || Object.values(profile).every((options) => !options?.length) ? <span role="status">{t("settingsPanels.common.auto")}</span> : null}
+            {isMjModel(props.config.model || props.config.imageModel) ? <div role="note" className="text-xs opacity-70">{`Midjourney：提示词不能超过 ${MJ_PROMPT_LIMIT} 个字符，一次返回 4 张图，约需 2–4 分钟。`}</div> : null}
         </div>
     );
 }

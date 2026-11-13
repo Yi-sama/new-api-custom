@@ -1,5 +1,222 @@
 # Local Video Studio
 
+## Studio Static Entry Repair (2026-11-10)
+
+US main and standby now run `studio-startup-20261110`, SHA256
+`a2ac43020dfa0f8768a449890976ec78fd438bc4d3e666a7c97441f78c23de22`,
+layered on the exactly reproduced `body-limit-20261109` binary. This preserves
+the existing P1 and body-limit fixes. HTML entries use `no-store` and ignore
+old conditional validators because Nginx rewrites their scripts independently
+of the source HTML modification time. Missing `/assets/` and `/plugins/`
+resources return 404, while valid assets retain 304 validation and SPA routes
+remain available. The standby now mounts the main instance's existing read-only
+Canvas directory; its old symlink resolved to an empty directory.
+
+Optional Canvas diagnostics are loaded asynchronously. A browser regression
+using the deployed bundle proves the editor can start while that request is
+held open. The other existing frontend patches were preserved.
+
+After reproducing the same controller failures against production's baseline,
+the P1 refund test was corrected to wait for the existing asynchronous refund,
+without changing production accounting. Baseline and candidate regressions
+passed; the candidate passed 59 focused top-level tests. Live main/standby and
+TLS-origin checks confirmed HTML refresh, script MIME types, missing-resource
+404s, existing-asset 304s, health, exact running hashes, restored ingress, and
+the removal of this rollout's execution pause. All 27 unrelated container IDs
+were unchanged. No migration, historical resubmission, or accounting adjustment
+was made; 45 uncertain image jobs remain unchanged.
+
+The user confirms their production page opens and looks normal, with possible
+mild sluggishness. The agent's authenticated Edge session still shows the
+loading overlay without an observed child-frame/session handshake; its cause
+is unknown and must not be generalized to a production outage.
+
+A read-only follow-up matched 52 Canvas files and the requirements module to
+the live release. The isolated, single-text-node browser fixture passed all 16
+pan, wheel, cloud-content, selection, project-switch and saved-view checks at
+normal and 8x CPU throttling, with no page errors, unexpected requests or
+viewport anomalies. Its first throttled run requested cloud sync before local
+view persistence and hit the existing pending-edit guard; the fixture now waits
+for persistence, without changing that production safeguard. These checks do
+not establish large-project or network performance. Desktop screenshots were
+inspected; 390px screenshots show header overlap and clipped toolbars with the
+sidebar open, so small-screen layout remains unverified for usability.
+
+Post-release logs contain successful workspace reads/writes, asset uploads and
+job API requests, with no selected 4xx/5xx, panics, missing-schema or refunding
+errors. Five fresh Canvas sessions had no viewport anomalies; one 88.6ms frame
+gap occurred near resize events, and one frontend error has no message/stack
+available for attribution. Exclude pre-release tabs from this sample. No
+additional production change, restart or paid generation was made.
+
+Operational scripts and verification are under
+`/opt/us-whitelist/ops/studio-startup-20261110/`. Backend rollback is
+`python3 -B /opt/us-whitelist/ops/studio-startup-20261110/deploy-newapi.py rollback`;
+the deployment state and exact Compose backups are in the matching release
+directory. The async-only ingress backup is
+`/etc/nginx/conf.d/api-yisama.conf.before-async-diagnostics-20261110`.
+
+## MJ Prompt Length Limit (2026-11-03)
+
+Live probes with the production keys: uuyue accepts 850 characters and rejects 900
+(HTTP 400 `media_error`, immediately); osodm accepts 750 and rejects 850 (HTTP 400
+`invalid_request` after one to two minutes). The failing canvas prompts were 1791
+characters. Studio MJ jobs on both channels (Ember and OC) are limited to 750
+characters (`emberMJPromptLimit`, shared by `ocMJPromptLimit`), checked before any
+quota is reserved, with a job error naming the limit. The canvas and the model plaza
+must show this rule whenever an MJ model is used. osodm's
+`/v1/images/midjourney/generations` blocks about 220 s and returns four images.
+
+## Uuyue Protocol Recheck (2026-11-03 15:46)
+
+The supplied screenshots compare repeated GET queries for the old
+`d8621016-40ad-5218-9102-036cc7ac9c5c` task with synchronous image submissions.
+The current public Ember documentation still specifies POST
+`/v1/images/generations`, `X-Ember-Image-Protocol: mj-proxy`, a UUID
+`Idempotency-Key`, then GET `/v1/mj/tasks/{uuid}` using the same key.
+The saved task key matches channel 63's current key: the old user task returns
+404, while yesterday's completed probe still returns 200 and four images.
+The original user task's upstream submission receipt was not retained, so the
+historical rejection or loss of its upstream record remains unproven.
+
+One new independent probe at 15:38:49 returned HTTP 202 in 0.65 seconds with
+the original UUID `cbd345e8-cb82-41dc-9e3e-67745686bee4`. Polling reached
+`completed` with four images at 15:45:53; all four authenticated PNG downloads
+passed (1455018, 1341853, 1727727 and 1319421 bytes). Receipt and raw submission
+response are under `/opt/us-whitelist/runtime/mj-uuyue-format-20261103-receipt*`.
+No old job was resubmitted and channel 63 remains manually disabled.
+
+This success does not validate OC. User 1's separate 14:39:41 OC v6 job
+`studio_1811745b0f9c41c7a9fc371db2365b81` returned upstream HTTP 500 after
+1800 seconds, with no task ID; its private response says `server_error`.
+It remains uncertain with 160000 quota and no observed refund. No code,
+billing records, channel settings or running services were changed here.
+
+## Wallet Schema Incident (2026-11-03)
+
+The 14:27 `settled-balance-20261103-r2` release made `/api/user/self`
+read `wallet_pre_consume_records` before its migration was applied. Both main
+and standby run with `NODE_TYPE=slave`, so `InitDB` skips automatic migrations.
+This caused SQLSTATE 42P01 when opening the studio, independently of MJ.
+
+During this investigation the parallel wallet task completed the existing
+migration by 14:32:57 Asia/Shanghai. All eight model columns and four indexes
+(including the primary key) were checked. Authenticated `/api/user/self` and
+`/api/user/self/balance` returned HTTP 200 and `success: true` on both services;
+no subsequent wallet missing-table errors were found. This investigation did
+not alter billing data, resubmit jobs, replace binaries or restart services.
+Future slave-node releases requiring schema changes must apply and verify the
+matching migration before switching traffic; `/api/status` alone is not a
+sufficient schema-readiness check.
+
+## OC MJ Async Integration (2026-11-03)
+
+OC's current model documentation provides `POST /v1/images/midjourney/generations`
+and `GET /v1/images/midjourney/tasks/{task_id}`. The studio now selects this
+protocol only for the OC channel (or `X-OC-Image-Protocol: mj-async` override),
+separately from Uuyue's Ember protocol. It saves the assigned upstream task ID,
+key and route, polls the same task, and stores all four `SUCCESS` images from
+`result.data` behind owner-checked studio asset endpoints. `n=1` reserves four
+images; failure refunds once, and a missing receipt becomes uncertain without
+querying a fabricated ID or replaying POST. The existing task timeout is unchanged.
+
+Focused service/controller/router, billing/refund and Fast regressions passed
+on the complete production source snapshot. Browser checks against live frontend
+modules with mocked APIs verified four-image return/storage and passing only
+the selected third image's original bytes as a video's `input_reference`.
+The dirty D: worktree has concurrent wallet work; its unrelated
+`service/wallet_balance_test.go` initially failed to compile with
+`undefined: dto.UserSetting`, so none of that work was included in this release.
+
+An independent real OC async submission timed out after 75 seconds without a
+task receipt. Its private receipt is
+`/opt/us-whitelist/runtime/mj-oc-async-20261103-receipt.json`; it was not replayed.
+Real upstream image completion remains unverified. Neither of user 12's
+previous uncertain/pending tasks was resubmitted.
+
+Deployed at 14:03 Asia/Shanghai as `mj-oc-async-20261103`, binary SHA256
+`6d998d706abaf43c79530f08c839a454a8b88b3389f34358ee48e61db96a368f`.
+Only the `new-api` container's binary mount changed. Health and local status API
+passed; all 237 embedded frontend files, nginx, Fast behavior and channel states
+were preserved. Rollback configuration is stored in
+`/opt/us-whitelist/releases/mj-oc-async-20261103/rollback-compose.json`.
+Reconstruct source from the base/group-name archive, MJ overlay, Fast overlay,
+then this release's `oc-source-overlay.tar.gz`; do not build from the incomplete
+D: checkout or publish the obsolete `release-v4/new-api`.
+
+## MJ Failure Investigation (2026-11-03)
+
+User 12 (`soulmate`) submitted four `Midjourney-v8.2` jobs at 09:08:46-09:09:20
+Asia/Shanghai. All failed at submission, with four matching wallet refunds and
+zero remaining task quota. Their original upstream HTTP statuses/bodies were
+not retained, so the specific original rejection cannot be reconstructed.
+
+Direct checks found a valid key, USD 9.62 remaining, and the model still listed.
+Independent minimal requests with UUID v4 and v5, and the original prompt with
+UUID v4, all returned HTTP 503. Queries for these probe UUIDs returned 404;
+upstream usage reported zero requests/cost for November 3. Neither UUID version
+nor prompt flags is an established cause. Do not deploy the speculative UUID
+change or automatically resubmit any affected user job.
+
+The local adapter now includes HTTP status in definite rejection reasons and
+logs non-success submission status with the job and upstream UUID, without
+logging credentials or prompts. It also keeps at most 4096 bytes of the upstream
+error body and its HTTP status in task private data, never in task API responses.
+Focused MJ/studio tests cover bounded private diagnostics, 503 recovery, no
+repeat POST, and one-time refunds. This diagnostic change was not deployed
+during this investigation. Current production is
+`fast-sub2api-20261103`; preserve that overlay in any later release.
+
+Follow-up at 12:09 Asia/Shanghai: the same key now lists only Claude models;
+the provider's public model plaza also contains no MJ model. Channel 63 is
+already manually disabled; this investigation did not change its status.
+The actual Go request function, using both HTTP/2 and HTTP/1.1, returns the same
+results as Python: yesterday's completed UUID is readable, while the user's
+11:30 task `d8621016-40ad-5218-9102-036cc7ac9c5c` returns 404 and still reserves
+320000 quota. These read-only checks made no generation request. Current model
+availability does not establish the exact cause of the four earlier rejections.
+
+The same user's 11:54 OC job `studio_abecf10bf5f948628e47eea6dc8c8eb2`
+also became uncertain after about 600 seconds with `unexpected end of JSON
+input`; logs confirm its USD 0.08 reservation was refunded. OC's model list is
+reachable, but this real generation did not succeed, so do not call OC a
+currently verified working fallback. Neither uncertain job was resubmitted.
+
+## MJ Channel Adapter (2026-11-02)
+
+Managed image jobs use the Ember asynchronous protocol only for MJ models on
+`api.uuyue.top`, or a selected channel whose administrator sets
+`X-Ember-Image-Protocol: mj-proxy` in its header overrides. OC and other channels
+keep the synchronous image relay.
+
+The adapter submits once with a persisted UUID and `n=1`, queries the original
+`/v1/mj/tasks/{uuid}`, and stores four authenticated image downloads as normal
+owner-scoped studio assets. Ambiguous submissions and `uncertain` query states
+never trigger another POST. One Data URI reference is converted to multipart
+`image[]`; resolution and ratio are separate `size` and `aspect_ratio` fields.
+Existing task billing/refund, worker scheduling and timeout policy are reused.
+
+Focused controller/service tests cover four-image recovery, a 502 submit,
+temporarily missing/uncertain tasks, mismatched UUIDs, saved channel credentials,
+one-time charging/refunds, reference conversion and redirect protection.
+Browser tests with mock jobs cover Uuyue/OC selection and four returned assets.
+The paid upstream probe submitted once, returned HTTP 202, reached `completed`,
+and downloaded all four images using authenticated task-image endpoints.
+Real reference editing and real provider failure/refund remain untested.
+
+The deployed release `/opt/us-whitelist/releases/mj-uuyue-20261102` uses production source commit
+`e0b8a9c77d7c91e6c2706499016880ae4c0c9d62` plus the scoped MJ overlay, preserving
+all 237 embedded web files. Do not deploy a binary built directly from this
+older local worktree over the production snapshot.
+Only `new-api` was recreated; the accrual service was unchanged. The saved
+`rollback-compose.json` and `nginx-before.conf` are inside that release directory.
+The public Canvas entry uses `/video-canvas/mj-uuyue-20261102/`. Post-deploy
+browser verification used real static resources and mocked job/catalog responses;
+the public status endpoint returned HTTP 200 without mocking. Both services
+were healthy, the main service had no startup panic, and available RAM was
+approximately 4.2 GiB after deployment. The whole older-worktree test suite was
+not green; non-MJ model-list/top-up assertions also fail without running MJ tests.
+
 This integration adds `/video-studio` as a standalone, authenticated page.
 It fills the viewport without the New API dashboard header/sidebar or an
 outer account bar. The original Canvas navigation has a leftmost return to
@@ -220,3 +437,13 @@ local launcher and original database. Do not reset the dirty worktree.
   after the browser was closed and charged the synthetic account once.
   Port 3000 is currently stopped. No real provider or US-server generation
   was submitted.
+
+## MJ Limit Rollout (2026-11-03 19:40)
+
+Canvas: patched live chunks `image-`, `app-`, `index-C2Z7Mhae-pricing-2cf602609685.js` into
+`/var/www/mj-limit-20261103` (copy of `mj-uuyue-20261102`) and pointed both nginx
+`sub_filter` entry lines at it; previous conf is
+`/opt/us-whitelist/ops/mj-limit-20261103/api-yisama.conf.before`. Plaza: the 11 MJ
+`models.description` rows got a 750-character note; originals are in
+`models-descriptions.before.csv` in the same directory. The Go limit is source-only until
+a binary is rebuilt from the current production overlay chain (not done).

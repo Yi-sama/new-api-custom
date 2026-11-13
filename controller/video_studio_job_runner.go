@@ -76,6 +76,10 @@ func runVideoStudioJobs(ctx context.Context, runnerTask string) error {
 			} else {
 				job.Status, job.Error = model.StudioJobUncertain, "submission was interrupted; do not submit it again until checked"
 			}
+		} else if job.Kind == "image" && job.TaskID != "" && isStudioMJTask(job) {
+			if err := syncStudioMJResult(ctx, job); err != nil {
+				common.SysError("studio MJ result " + job.ID + ": " + err.Error())
+			}
 		} else if job.Kind == "image" {
 			_, completedErr := os.Stat(service.VideoStudioJobPath(job.ID, "relay-complete"))
 			response, responseErr := os.Open(service.VideoStudioJobPath(job.ID, "response.bin"))
@@ -331,6 +335,13 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 		job.Status, job.Error = model.StudioJobQueued, ""
 		return
 	}
+	if job.Kind == "image" && job.TaskID == "" {
+		job.TaskID = model.GenerateTaskID()
+		if err := model.SaveStudioJobState(job); err != nil {
+			job.Status, job.Error = model.StudioJobUncertain, "could not persist image task identity"
+			return
+		}
+	}
 	job.Status, job.Error = model.StudioJobFailed, "generation could not be started"
 	input, err := os.Open(service.VideoStudioJobPath(job.ID, "request.bin"))
 	if err != nil {
@@ -399,6 +410,16 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 		}
 		c.Next()
 	}, middleware.Distribute(), func(c *gin.Context) {
+		headers, _ := common.GetContextKey(c, constant.ContextKeyChannelHeaderOverride)
+		overrides, _ := headers.(map[string]interface{})
+		if job.Kind == "image" && service.UsesEmberMJProtocol(common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl), job.Model, overrides) {
+			submitStudioMJ(c, job, constant.TaskPlatformEmberMJ)
+			return
+		}
+		if job.Kind == "image" && service.UsesOCMJProtocol(common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl), job.Model, overrides) {
+			submitStudioMJ(c, job, constant.TaskPlatformOCMJ)
+			return
+		}
 		if job.Kind == "video" {
 			VideoStudioRelayTask(c)
 		} else {
@@ -406,6 +427,12 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 		}
 	})
 	router.ServeHTTP(writer, request)
+	if job.Kind == "image" && isStudioMJTask(job) {
+		if err := syncStudioMJResult(ctx, job); err != nil {
+			common.SysError("studio MJ result " + job.ID + ": " + err.Error())
+		}
+		return
+	}
 	if !attempted && ctx.Err() != nil {
 		job.Status, job.Error = model.StudioJobQueued, ""
 		return
@@ -415,6 +442,16 @@ func executeStudioJob(ctx context.Context, job *model.StudioJob) {
 	}
 	if writer.err != nil || writer.status < 200 || writer.status >= 300 {
 		job.Error = "generation request was rejected"
+		if !attempted && job.Kind == "image" && writer.err == nil && writer.status == http.StatusBadRequest {
+			var rejection struct {
+				Message string `json:"message"`
+			}
+			if _, err := output.Seek(0, io.SeekStart); err == nil &&
+				common.DecodeJson(io.LimitReader(output, 16384), &rejection) == nil &&
+				strings.HasPrefix(rejection.Message, "MJ ") && len(rejection.Message) <= 200 {
+				job.Error = rejection.Message
+			}
+		}
 		if attempted {
 			job.Status, job.Error = model.StudioJobUncertain, "upstream submission could not be confirmed; do not automatically resubmit"
 			if job.Kind == "image" && writer.err == nil && writer.status == http.StatusBadRequest {

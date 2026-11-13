@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
@@ -58,6 +59,12 @@ func GetUserGroups(c *gin.Context) {
 		usableGroups["auto"] = map[string]interface{}{
 			"ratio": "自动",
 			"desc":  setting.GetUsableGroupDescription("auto"),
+		}
+	}
+	displayNames := setting.GetGroupDisplayNamesCopy()
+	for groupName, info := range usableGroups {
+		if name := strings.TrimSpace(displayNames[groupName]); name != "" {
+			info["display_name"] = name
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{

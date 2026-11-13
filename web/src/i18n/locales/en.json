@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Group display names": "Group display names",
+    "Expected a JSON object mapping group identifiers to display names": "Expected a JSON object mapping group identifiers to display names",
+    "My Liandong Shop": "My Liandong Shop",
+    "Explore my shop": "Explore my shop",
     "Studio parameter profiles": "Studio parameter profiles",
     "Image sizes": "Image sizes",
     "Image aspect ratios": "Image aspect ratios",

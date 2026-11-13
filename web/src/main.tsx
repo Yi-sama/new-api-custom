@@ -28,7 +28,7 @@ import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { toast } from 'sonner'
 
-import { getStatus } from '@/lib/api'
+import { statusQueryOptions } from '@/lib/api'
 import { installBuildMetadata } from '@/lib/build-metadata'
 import { applyFaviconToDom } from '@/lib/dom-utils'
 import '@/lib/dayjs'
@@ -136,7 +136,8 @@ if (!rootElement) {
       /* empty */
     }
     // Background refresh
-    getStatus()
+    queryClient
+      .fetchQuery(statusQueryOptions)
       .then((s) => {
         if (s?.system_name) {
           apply(s.system_name as string)

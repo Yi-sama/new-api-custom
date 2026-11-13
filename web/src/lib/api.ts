@@ -77,7 +77,17 @@ export async function getUserGroups(): Promise<{
 
 export async function getStatus() {
   const res = await api.get('/api/status')
+  if (!res.data?.success) {
+    throw new Error(res.data?.message || 'Failed to fetch status')
+  }
   return res.data?.data as Record<string, unknown>
+}
+
+export const statusQueryOptions = {
+  queryKey: ['status'] as const,
+  queryFn: getStatus,
+  staleTime: 5 * 60 * 1000,
+  gcTime: 30 * 60 * 1000,
 }
 
 export async function getNotice(): Promise<{

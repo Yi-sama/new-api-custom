@@ -125,6 +125,18 @@ const createGroupSchema = (t: Translate) =>
     GroupRatioAddition: createJsonStringField(t),
     TopupGroupRatio: createJsonStringField(t),
     UserUsableGroups: createJsonStringField(t),
+    GroupDisplayNames: createJsonStringField(t, {
+      allowEmpty: false,
+      predicate: (parsed) =>
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        Object.entries(parsed).every(
+          ([group, name]) => group.trim() !== '' && typeof name === 'string'
+        ),
+      predicateMessage:
+        'Expected a JSON object mapping group identifiers to display names',
+    }),
     GroupGroupRatio: createJsonStringField(t),
     AutoGroups: createJsonStringField(t, {
       predicate: (parsed) =>
@@ -206,6 +218,7 @@ export function RatioSettingsCard({
     GroupRatioAddition: normalizeJsonString(groupDefaults.GroupRatioAddition),
     TopupGroupRatio: normalizeJsonString(groupDefaults.TopupGroupRatio),
     UserUsableGroups: normalizeJsonString(groupDefaults.UserUsableGroups),
+    GroupDisplayNames: normalizeJsonString(groupDefaults.GroupDisplayNames),
     GroupGroupRatio: normalizeJsonString(groupDefaults.GroupGroupRatio),
     AutoGroups: normalizeJsonString(groupDefaults.AutoGroups),
     MaxTokenAutoGroups: groupDefaults.MaxTokenAutoGroups,
@@ -243,9 +256,12 @@ export function RatioSettingsCard({
     defaultValues: {
       ...groupDefaults,
       GroupRatio: formatJsonForTextarea(groupDefaults.GroupRatio),
-      GroupRatioAddition: formatJsonForTextarea(groupDefaults.GroupRatioAddition),
+      GroupRatioAddition: formatJsonForTextarea(
+        groupDefaults.GroupRatioAddition
+      ),
       TopupGroupRatio: formatJsonForTextarea(groupDefaults.TopupGroupRatio),
       UserUsableGroups: formatJsonForTextarea(groupDefaults.UserUsableGroups),
+      GroupDisplayNames: formatJsonForTextarea(groupDefaults.GroupDisplayNames),
       GroupGroupRatio: formatJsonForTextarea(groupDefaults.GroupGroupRatio),
       AutoGroups: formatJsonForTextarea(groupDefaults.AutoGroups),
       GroupSpecialUsableGroup: formatJsonForTextarea(
@@ -295,6 +311,7 @@ export function RatioSettingsCard({
       GroupRatioAddition: normalizeJsonString(groupDefaults.GroupRatioAddition),
       TopupGroupRatio: normalizeJsonString(groupDefaults.TopupGroupRatio),
       UserUsableGroups: normalizeJsonString(groupDefaults.UserUsableGroups),
+      GroupDisplayNames: normalizeJsonString(groupDefaults.GroupDisplayNames),
       GroupGroupRatio: normalizeJsonString(groupDefaults.GroupGroupRatio),
       AutoGroups: normalizeJsonString(groupDefaults.AutoGroups),
       MaxTokenAutoGroups: groupDefaults.MaxTokenAutoGroups,
@@ -307,9 +324,12 @@ export function RatioSettingsCard({
     groupForm.reset({
       ...groupDefaults,
       GroupRatio: formatJsonForTextarea(groupDefaults.GroupRatio),
-      GroupRatioAddition: formatJsonForTextarea(groupDefaults.GroupRatioAddition),
+      GroupRatioAddition: formatJsonForTextarea(
+        groupDefaults.GroupRatioAddition
+      ),
       TopupGroupRatio: formatJsonForTextarea(groupDefaults.TopupGroupRatio),
       UserUsableGroups: formatJsonForTextarea(groupDefaults.UserUsableGroups),
+      GroupDisplayNames: formatJsonForTextarea(groupDefaults.GroupDisplayNames),
       GroupGroupRatio: formatJsonForTextarea(groupDefaults.GroupGroupRatio),
       AutoGroups: formatJsonForTextarea(groupDefaults.AutoGroups),
       GroupSpecialUsableGroup: formatJsonForTextarea(
@@ -368,6 +388,7 @@ export function RatioSettingsCard({
         GroupRatioAddition: normalizeJsonString(values.GroupRatioAddition),
         TopupGroupRatio: normalizeJsonString(values.TopupGroupRatio),
         UserUsableGroups: normalizeJsonString(values.UserUsableGroups),
+        GroupDisplayNames: normalizeJsonString(values.GroupDisplayNames),
         GroupGroupRatio: normalizeJsonString(values.GroupGroupRatio),
         AutoGroups: normalizeJsonString(values.AutoGroups),
         MaxTokenAutoGroups: values.MaxTokenAutoGroups,
@@ -391,7 +412,11 @@ export function RatioSettingsCard({
 
       for (const key of updates) {
         const apiKey = apiKeyMap[key] || key
-        await updateOption.mutateAsync({ key: apiKey, value: normalized[key] })
+        const result = await updateOption.mutateAsync({
+          key: apiKey,
+          value: normalized[key],
+        })
+        if (!result.success) return
       }
 
       groupNormalizedDefaults.current = normalized

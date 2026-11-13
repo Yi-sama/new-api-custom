@@ -258,7 +258,7 @@ func CreateVideoStudioJob(kind, operation string) gin.HandlerFunc {
 			Parameters: parameterJSON, Status: model.StudioJobQueued, CreatedAt: now, UpdatedAt: now,
 			ContentType: c.GetHeader("Content-Type"), Fingerprint: fingerprint,
 		}
-		if kind == "video" {
+		if kind == "video" || kind == "image" {
 			job.TaskID = model.GenerateTaskID()
 		}
 		body, err := common.GetBodyStorage(c)

@@ -16,8 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useCallback } from 'react'
 
+import { statusQueryOptions } from '@/lib/api'
 import { DEFAULT_SYSTEM_NAME, DEFAULT_LOGO } from '@/lib/constants'
 import { applyFaviconToDom } from '@/lib/dom-utils'
 import {
@@ -102,17 +104,6 @@ export function mapStatusDataToConfig(
   }
 }
 
-// Fetch system config from API
-async function fetchSystemConfig(): Promise<Partial<SystemConfig>> {
-  const response = await fetch('/api/status')
-  if (!response.ok) throw new Error('Failed to fetch status')
-
-  const data: StatusApiResponse = await response.json()
-  if (!data.success) throw new Error('API returned error')
-
-  return mapStatusDataToConfig(data.data)
-}
-
 // Preload image and return cleanup function
 function preloadImage(
   src: string,
@@ -142,6 +133,7 @@ function preloadImage(
  * const { systemName, logo, loading } = useSystemConfig()
  */
 export function useSystemConfig(options: UseSystemConfigOptions = {}) {
+  const queryClient = useQueryClient()
   const { autoLoad = false } = options
   const {
     config,
@@ -156,15 +148,15 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
   const loadConfig = useCallback(async () => {
     try {
       setLoading(true)
-      const newConfig = await fetchSystemConfig()
-      setConfig(newConfig)
+      const status = await queryClient.fetchQuery(statusQueryOptions)
+      setConfig(mapStatusDataToConfig(status))
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to load system config:', error)
     } finally {
       setLoading(false)
     }
-  }, [setConfig, setLoading])
+  }, [queryClient, setConfig, setLoading])
 
   useEffect(() => {
     if (autoLoad) loadConfig()

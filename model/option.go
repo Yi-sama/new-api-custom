@@ -150,6 +150,7 @@ func InitOptionMap() {
 	common.OptionMap["GroupRatioAddition"] = ratio_setting.GroupRatioAddition2JSONString()
 	common.OptionMap["GroupGroupRatio"] = ratio_setting.GroupGroupRatio2JSONString()
 	common.OptionMap["UserUsableGroups"] = setting.UserUsableGroups2JSONString()
+	common.OptionMap[setting.GroupDisplayNamesOptionKey] = setting.GroupDisplayNames2JSONString()
 	common.OptionMap["CompletionRatio"] = ratio_setting.CompletionRatio2JSONString()
 	common.OptionMap["ImageRatio"] = ratio_setting.ImageRatio2JSONString()
 	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
@@ -227,6 +228,9 @@ func validateOptionValue(key string, value string) error {
 	if key == setting.FastModeAllowedGroupsOptionKey {
 		return setting.ValidateFastModeAllowedGroups(value)
 	}
+	if key == setting.GroupDisplayNamesOptionKey {
+		return setting.ValidateGroupDisplayNames(value)
+	}
 	if key == NikoGroupSyncOptionKey {
 		return ValidateNikoGroupSyncConfig(value)
 	}
@@ -240,7 +244,8 @@ func validateOptionValue(key string, value string) error {
 }
 
 func UpdateOption(key string, value string) error {
-	if key == StatusImageConfigOptionKey || key == setting.FastModeAllowedGroupsOptionKey {
+	if key == StatusImageConfigOptionKey || key == setting.FastModeAllowedGroupsOptionKey ||
+		key == setting.GroupDisplayNamesOptionKey {
 		return UpdateOptionsBulk(map[string]string{key: value})
 	}
 	if err := validateOptionValue(key, value); err != nil {
@@ -592,6 +597,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateGroupGroupRatioByJSONString(value)
 	case "UserUsableGroups":
 		err = setting.UpdateUserUsableGroupsByJSONString(value)
+	case setting.GroupDisplayNamesOptionKey:
+		err = setting.UpdateGroupDisplayNamesByJSONString(value)
 	case "CompletionRatio":
 		err = ratio_setting.UpdateCompletionRatioByJSONString(value)
 	case "ModelPrice":

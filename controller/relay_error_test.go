@@ -62,3 +62,23 @@ func TestClientFacingRelayErrorPreservesContentPolicyRejection(t *testing.T) {
 		})
 	}
 }
+
+func TestClientFacingRelayErrorPreservesPayloadTooLarge(t *testing.T) {
+	original := types.WithOpenAIError(types.OpenAIError{
+		Message: "private upstream address: request body exceeds 64MB",
+		Type:    "upstream_error",
+		Code:    "upstream_error",
+	}, http.StatusRequestEntityTooLarge)
+
+	clientError := clientFacingRelayError(original, true)
+
+	require.NotNil(t, clientError)
+	require.Equal(t, http.StatusRequestEntityTooLarge, clientError.StatusCode)
+	require.Equal(t, "request_body_too_large", clientError.ToOpenAIError().Code)
+	require.Equal(t, "invalid_request_error", clientError.ToOpenAIError().Type)
+	require.Contains(t, clientError.ToOpenAIError().Message, "Reduce")
+	require.NotContains(t, clientError.ToOpenAIError().Message, "private upstream")
+	require.NotContains(t, clientError.ToOpenAIError().Message, "64MB")
+	require.Equal(t, "request_body_too_large", clientError.ToClaudeError().Type)
+	require.Equal(t, http.StatusRequestEntityTooLarge, original.StatusCode)
+}

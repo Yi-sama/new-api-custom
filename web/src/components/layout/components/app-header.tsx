@@ -20,7 +20,6 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 
@@ -32,7 +31,7 @@ import { TopNav } from './top-nav'
 
 /**
  * General application Header component
- * Integrates navigation bar, search, configuration and profile functions
+ * Integrates navigation bar, mode switching, configuration and profile functions
  *
  * @example
  * // Basic usage
@@ -43,7 +42,7 @@ import { TopNav } from './top-nav'
  * <AppHeader navLinks={customLinks} />
  *
  * @example
- * // Hide navigation bar and search box
+ * // Hide navigation bar and simple-mode switch
  * <AppHeader showTopNav={false} showSearch={false} />
  *
  * @example
@@ -68,7 +67,8 @@ type AppHeaderProps = {
    */
   leftContent?: React.ReactNode
   /**
-   * Whether to show search box
+   * Whether to show the simple-mode switch.
+   * Kept as `showSearch` for caller compatibility.
    * @default true
    */
   showSearch?: boolean
@@ -125,7 +125,15 @@ export function AppHeader({
                 <TopNav links={links} />
               </div>
             )}
-            {showSearch && <Search />}
+            {showSearch && (
+              <a
+                href='/start/'
+                aria-label='切换到简洁模式'
+                className='text-muted-foreground hover:text-foreground inline-flex items-center rounded-md px-2 py-1 text-sm transition-colors'
+              >
+                简洁模式
+              </a>
+            )}
             {showNotifications && (
               <NotificationPopover
                 open={notifications.popoverOpen}

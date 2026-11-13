@@ -25,7 +25,7 @@ func setupImageStudioFunding(t *testing.T, wallet int, preference string) (*gin.
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.ImageStudioCredit{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.WalletPreConsumeRecord{}, &model.ImageStudioCredit{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
 	model.DB, model.LOG_DB = db, db
 	t.Cleanup(func() {
 		model.DB, model.LOG_DB = previousDB, previousLogDB
@@ -149,10 +149,12 @@ func TestImageStudioRefundAndExhaustion(t *testing.T) {
 		return err == nil && credit.Quota == 500000 && getUserQuota(t, info.UserId) == 200000
 	}, time.Second, time.Millisecond)
 	info.Billing = nil
+	info.RequestId = "studio-second-request"
 	require.Nil(t, PreConsumeBilling(c, 600000, info))
 	require.NoError(t, info.Billing.Settle(650000))
 	next := *info
 	next.Billing = nil
+	next.RequestId = "studio-wallet-request"
 	require.Nil(t, PreConsumeBilling(c, 40000, &next))
 	assert.Equal(t, BillingSourceWallet, next.BillingSource)
 	require.NoError(t, next.Billing.Settle(40000))

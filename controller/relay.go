@@ -403,6 +403,13 @@ func clientFacingRelayError(err *types.NewAPIError, upstreamRequestAttempted boo
 	if err == nil || !upstreamRequestAttempted || err.StatusCode == http.StatusTooManyRequests || err.StatusCode/100 == 5 {
 		return err
 	}
+	if err.StatusCode == http.StatusRequestEntityTooLarge {
+		return types.WithOpenAIError(types.OpenAIError{
+			Message: "Request body is too large for the upstream service. Reduce image attachments or conversation size before resending.",
+			Type:    "invalid_request_error",
+			Code:    "request_body_too_large",
+		}, http.StatusRequestEntityTooLarge)
+	}
 	if code := err.ToOpenAIError().Code; err.StatusCode == http.StatusBadRequest &&
 		(code == "content_policy_violation" || code == "moderation_blocked") {
 		return types.WithOpenAIError(types.OpenAIError{

@@ -17,6 +17,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { requestEdit, requestGeneration } from "@/services/api/image";
+import { isMjModel, MJ_PROMPT_LIMIT, mjPromptLength } from "@/lib/mj-prompt";
 import { fetchStudioImageJobResult, resolveStudioJobReference, isStudioJobFailed, isStudioJobInterrupted, isStudioJobSubmissionUncertain, studioJobText, type StudioJob, type StudioJobReference } from "@/services/api/studio-jobs";
 import { StudioHistoryControls, StudioTaskPaused, useStudioJobHistory } from "@/components/studio-job-history";
 import { deleteStoredImages, ensureImagePreview, getImagePreviewRevision, previewUrlFor, resolveImageUrl, subscribeImagePreviews, uploadImage } from "@/services/image-storage";
@@ -494,6 +495,11 @@ export default function ImagePage() {
                                     </div>
                                 </div>
                                 <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={7} placeholder={t("imageWorkbench.promptPlaceholder")} />
+                                {isMjModel(model) ? (
+                                    <div role="note" className={`mt-1 text-xs ${mjPromptLength(prompt) > MJ_PROMPT_LIMIT ? "text-red-500" : "opacity-70"}`}>
+                                        {`Midjourney：${mjPromptLength(prompt)} / ${MJ_PROMPT_LIMIT} 字符，超出会被拒绝；一次返回 4 张图。`}
+                                    </div>
+                                ) : null}
                             </div>
 
                             <div className="min-w-0">
