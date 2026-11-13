@@ -1,0 +1,26 @@
+{
+  "captured_date": "2026-11-13",
+  "source_archive_repository": "Yi-sama/us-server-sources",
+  "source_archive_commit": "0872cc455e7ffd29c19051dab13bae9d4b304222",
+  "source_base_commit": "8830665263d072d4baa298025db1130ed5797c9f",
+  "previous_backup_commit": null,
+  "source_mappings": [
+    {
+      "source": "variants/new-api-console-performance-20261113",
+      "destination": "",
+      "only": null
+    },
+    {
+      "source": "server/overlays/new-api/video-terminal-20261113",
+      "destination": "deployment-overlays/2026-11-13/video-terminal",
+      "only": [
+        "backend/",
+        "newapi-manifest.json"
+      ]
+    }
+  ],
+  "omitted_original_files_are_preserved": true,
+  "different_source_baselines_are_kept_on_separate_branches": true,
+  "clean_build_and_latest_deployed_binary_equivalence": "not_verified",
+  "runtime_credentials_and_application_data": "not_included"
+}

@@ -1,0 +1,11 @@
+{
+  "databaseMigration": false,
+  "binarySha256": "7ab31c258d5169a31d4485ca970970f2ac84f17bee8026c31425ee5e40bf163d",
+  "changedSources": {
+    "controller/video_studio_job_runner.go": "0576dec43696815a8851fe6e8848b74014631d94fb7c2531c5e4546b3c29b13c"
+  },
+  "serverBuild": false,
+  "frontendChanged": false,
+  "release": "video-terminal-20261113",
+  "baselineSha256": "a2ac43020dfa0f8768a449890976ec78fd438bc4d3e666a7c97441f78c23de22"
+}
